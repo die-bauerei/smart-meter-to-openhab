@@ -9,7 +9,7 @@ class SmlReader():
         self._logger=logger
         self._smart_meter_values = SmartMeterValues()
 
-    def read_from_sml(self, time_out : timedelta = timedelta(minutes=10)) -> SmartMeterValues:
+    def read_from_sml(self, time_out : timedelta = timedelta(minutes=1)) -> SmartMeterValues:
         """Read data from the smart meter via SML
 
         Parameters
@@ -26,7 +26,7 @@ class SmlReader():
         data = ''
         self._smart_meter_values.reset()
         time_start=datetime.now()
-        while (datetime.now() - time_start) > time_out:
+        while (datetime.now() - time_start) <= time_out:
             input : bytes = self._port.read()
             data += input.hex()          # Convert Bytes to Hex String to use find function for easy parsing
 

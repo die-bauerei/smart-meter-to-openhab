@@ -2,7 +2,7 @@
 Pushing data of ISKRA MT175 smart meter to openhab
 
 ## Installation ##
-The python package can be downloaded from the github releases (e.g. *smart_meter_to_openhab-0.1.0.tar.gz*)
+The python package can be downloaded from the github releases (e.g. *smart_meter_to_openhab-0.1.1.tar.gz*)
 It as advisable to use the same python version as specfied in the pyproject.toml.
 Follow the process in *install-poetry.sh* 
 
@@ -24,7 +24,7 @@ python3 -m pip install --upgrade pip setuptools
 ```
 5. Install smart_meter_to_openhab
 ```bash
-pip install smart_meter_to_openhab-0.1.0.tar.gz
+pip install smart_meter_to_openhab-0.1.1.tar.gz
 ```
 6. Configure smart_meter_to_openhab
 ```bash
