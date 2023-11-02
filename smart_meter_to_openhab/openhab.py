@@ -2,6 +2,7 @@ import requests
 import http
 from logging import Logger
 from requests.auth import HTTPBasicAuth
+from requests.adapters import HTTPAdapter, Retry
 from typing import List
 from .interfaces import SmartMeterValues, OhItemAndValue, create_smart_meter_values
 
@@ -9,13 +10,18 @@ class OpenhabConnection():
     def __init__(self, oh_host : str, oh_user : str, oh_passwd : str, logger : Logger) -> None:
         self._oh_host=oh_host
         self._session=requests.Session()
-        self._session.auth=HTTPBasicAuth(oh_user, oh_passwd)
+        if oh_user:
+            self._session.auth=HTTPBasicAuth(oh_user, oh_passwd)
+        retries=Retry(total=5,
+                backoff_factor=0.1,
+                status_forcelist=[ 500, 502, 503, 504 ])
+        self._session.mount('http://', HTTPAdapter(max_retries=retries))
         self._session.headers={'Content-Type': 'text/plain'}
         self._logger=logger
 
     def post_to_items(self, values : SmartMeterValues) -> None:
         for v in values.convert_to_list():
-            if v.value is not None: 
+            if v.value is not None:
                 with self._session.post(url=f"{self._oh_host}/rest/items/{v.oh_item}", data=str(v.value)) as response:
                    if response.status_code != http.HTTPStatus.OK:
                         self._logger.warning(f"Failed to post value to openhab item {v.oh_item}. Return code: {response.status_code}. text: {response.text})")

@@ -5,7 +5,10 @@ import os
 from typing import Union
 
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
+package_path=Path(__file__).parent.parent.absolute()
+sys.path.insert(0, str(package_path))
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=f"{package_path}/.env")
 from smart_meter_to_openhab.openhab import OpenhabConnection
 from smart_meter_to_openhab.interfaces import SmartMeterValues
 

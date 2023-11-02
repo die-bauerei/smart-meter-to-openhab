@@ -58,6 +58,6 @@ class SmlReader():
                 break
         
         if (datetime.now() - time_start) > time_out:
-            self._logger.info(f"Exceeded time out of {time_out} while reading from smart meter.")
+            self._logger.warning(f"Exceeded time out of {time_out} while reading from smart meter.")
                 
         return self._smart_meter_values

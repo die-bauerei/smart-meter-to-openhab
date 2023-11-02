@@ -1,8 +1,9 @@
 # smart-meter-to-openhab
-Pushing data of ISKRA MT175 smart meter to openhab
+Pushing data of ISKRA MT175 smart meter to openhab. 
+For a connection to the Smart meter you need a USB infrared adapter. There are several adapters on the market (e.g. https://weidmann-elektronik.de/Produkt_IR-Kopf.html) that just need to be pluged in. They are usually detected as a casual serial port (/dev/ttyUSB0)
 
 ## Installation ##
-The python package can be downloaded from the github releases (e.g. *smart_meter_to_openhab-0.1.1.tar.gz*)
+The python package can be downloaded from the github releases (e.g. *smart_meter_to_openhab-0.1.2.tar.gz*)
 It as advisable to use the same python version as specfied in the pyproject.toml.
 Follow the process in *install-poetry.sh* 
 
@@ -24,15 +25,9 @@ python3 -m pip install --upgrade pip setuptools
 ```
 5. Install smart_meter_to_openhab
 ```bash
-pip install smart_meter_to_openhab-0.1.1.tar.gz
+pip install smart_meter_to_openhab-0.1.2.tar.gz
 ```
-6. Configure smart_meter_to_openhab
-```bash
-cd ~/smart_meter_py_env/lib/python3.11/site-packages/smart_meter_to_openhab
-# add your values to the file .env.example and change the name to .env
-mv .env.example .env
-```
-7. Run smart_meter_to_openhab with e.g.
+6. Run smart_meter_to_openhab with e.g.
 ```bash
 nohup python ~/smart_meter_py_env/lib/python3.11/site-packages/smart_meter_to_openhab_scripts/main.py --logfile ~/smart_meter.log --verbose &
 ```
@@ -50,7 +45,7 @@ Type=simple
 User=openhab
 Group=openhab
 UMask=002
-ExecStart=python /home/openhab/smart_meter_py_env/lib/python3.11/site-packages/smart_meter_to_openhab_scripts/main.py --logfile ~/smart_meter.log
+ExecStart=python ~/smart_meter_py_env/lib/python3.11/site-packages/smart_meter_to_openhab_scripts/main.py --logfile ~/smart_meter.log
 
 [Install]
 WantedBy=multi-user.target
