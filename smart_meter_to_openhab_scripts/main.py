@@ -6,14 +6,22 @@ import requests
 from pathlib import Path
 from time import sleep
 from dotenv import load_dotenv
+from typing import Union
 
-logger = logging.getLogger(__name__)
+def create_logger(file : Union[str, None], level ) -> logging.Logger:
+    logger = logging.getLogger('smart-meter-to-openhab')
+    logger.setLevel(level=level)
+    log_handler : Union[logging.FileHandler, logging.StreamHandler] = logging.FileHandler(file) if file else logging.StreamHandler() 
+    formatter = logging.Formatter("%(levelname)s: %(asctime)s: %(message)s")
+    log_handler.setFormatter(formatter)
+    logger.addHandler(log_handler)
+    return logger
 
 def create_args_parser() -> argparse.ArgumentParser:
     parser=argparse.ArgumentParser(description="Pushing data of ISKRA MT175 smart meter to openhab")
     parser.add_argument("--dotenv_path", type=Path, required=False, help=f"Provide the required environment variables in this .env file \
                         or by any other means (e.g. in your ~/.profile)")
-    parser.add_argument("--interval_in_sec", type=int, required=False, default=60, help="Interval in which the data will be read and pushed")
+    parser.add_argument("--interval_in_sec", type=int, required=False, default=10, help="Interval in which the data will be read and pushed")
     parser.add_argument("--logfile", type=Path, required=False, help="Write logging to this file instead of to stdout")
     parser.add_argument('-v', '--verbose', action='store_true')
     return parser
@@ -23,17 +31,11 @@ def main() -> None:
     args = parser.parse_args()
     if args.dotenv_path:
         load_dotenv(dotenv_path=args.dotenv_path)
-    
-    sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
-    from smart_meter_to_openhab.openhab import OpenhabConnection
-    from smart_meter_to_openhab.sml_iskra_mt175 import SmlReader
+    logger=create_logger(args.logfile, logging.INFO if args.verbose else logging.WARN)
     try:
-        loglevel=logging.INFO if args.verbose else logging.WARN
-        if args.logfile:
-            logging.basicConfig(filename=args.logfile, level=loglevel)
-        else:
-            logging.basicConfig(stream=sys.stdout, level=loglevel)
-
+        sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
+        from smart_meter_to_openhab.openhab import OpenhabConnection
+        from smart_meter_to_openhab.sml_iskra_mt175 import SmlReader
         oh_user=os.getenv('OH_USER') if 'OH_USER' in os.environ else ''
         oh_passwd=os.getenv('OH_PASSWD') if 'OH_PASSWD' in os.environ else ''
         oh_connection = OpenhabConnection(os.getenv('OH_HOST'), oh_user, oh_passwd, logger) # type: ignore

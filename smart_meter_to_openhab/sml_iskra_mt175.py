@@ -1,15 +1,16 @@
 import serial
 from datetime import timedelta, datetime
 from logging import Logger
+from typing import List, Any
 from .interfaces import SmartMeterValues
+from .openhab import OpenhabConnection
 
 class SmlReader():
     def __init__(self, serial_port : str, logger : Logger) -> None:
         self._port=serial.Serial(port=serial_port, baudrate=9600, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
         self._logger=logger
-        self._smart_meter_values = SmartMeterValues()
 
-    def read_from_sml(self, time_out : timedelta = timedelta(minutes=1)) -> SmartMeterValues:
+    def read_from_sml(self, time_out : timedelta = timedelta(seconds=10)) -> SmartMeterValues:
         """Read data from the smart meter via SML
 
         Parameters
@@ -24,7 +25,7 @@ class SmlReader():
             Contains the data read from the smart meter
         """
         data = ''
-        self._smart_meter_values.reset()
+        smart_meter_values=SmartMeterValues()
         time_start=datetime.now()
         while (datetime.now() - time_start) <= time_out:
             input : bytes = self._port.read()
@@ -41,23 +42,44 @@ class SmlReader():
                 data = data[0:pos + 16]                # cut trash after end delimiter
                 
                 pos = data.find('070100010800ff') # looking for OBIS Code: 1-0:1.8.0*255 - Energy kWh
-                self._smart_meter_values.electricity_meter.value = int(data[pos+36:pos + 52], 16) / 1e4 if pos != -1 else None
+                smart_meter_values.electricity_meter.value = int(data[pos+36:pos + 52], 16) / 1e4 if pos != -1 else None
 
                 pos = data.find('070100100700ff') # looking for OBIS Code: 1-0:16.7.0*255 - Sum Power L1,L2,L3
-                self._smart_meter_values.overall_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
+                smart_meter_values.overall_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
 
                 pos = data.find('070100240700ff') # looking for OBIS Code: 1-0:36.7.0*255 - current Power L1
-                self._smart_meter_values.phase_1_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
+                smart_meter_values.phase_1_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
 
                 pos = data.find('070100380700ff') # looking for OBIS Code: 1-0:56.7.0*255 - current Power L2
-                self._smart_meter_values.phase_2_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
+                smart_meter_values.phase_2_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
 
                 pos = data.find('0701004c0700ff') # looking for OBIS Code: 1-0:76.7.0*255 - current Power L3
-                self._smart_meter_values.phase_3_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
+                smart_meter_values.phase_3_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
 
                 break
         
         if (datetime.now() - time_start) > time_out:
             self._logger.warning(f"Exceeded time out of {time_out} while reading from smart meter.")
-                
-        return self._smart_meter_values
+        
+        return smart_meter_values
+
+        def read_and_validate_from_sml(self, oh_connection : OpenhabConnection, time_out : timedelta = timedelta(minutes=1)) -> SmartMeterValues:
+            def has_outlier(value_list : List[Any], ref_value_list : List[Any]) -> bool:
+                for i in range(len(value_list)):
+                    if ref_value_list[i] is not None and value_list[i]*10 > ref_value_list[i]:
+                        return True
+                return False
+            ref_value_list = oh_connection.get_median_from_items(SmartMeterValues.oh_item_names).convert_to_value_list()
+            time_start=datetime.now()
+            while (datetime.now() - time_start) <= time_out:
+                values=self.read_from_sml()
+                value_list=values.convert_to_value_list()
+                if values.has_none_value() or has_outlier(value_list, ref_value_list):
+                    self._logger.info(f"Detected invalid or unrealistic values during SML read. Trying again")
+                else:
+                    break
+
+            if (datetime.now() - time_start) > time_out:
+                self._logger.warning(f"Exceeded time out of {time_out} while validating values from smart meter.")
+
+            return values

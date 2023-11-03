@@ -1,9 +1,11 @@
 import requests
 import http
+import datetime
 from logging import Logger
 from requests.auth import HTTPBasicAuth
 from requests.adapters import HTTPAdapter, Retry
 from typing import List
+from statistics import median
 from .interfaces import SmartMeterValues, OhItemAndValue, create_smart_meter_values
 
 class OpenhabConnection():
@@ -20,7 +22,7 @@ class OpenhabConnection():
         self._logger=logger
 
     def post_to_items(self, values : SmartMeterValues) -> None:
-        for v in values.convert_to_list():
+        for v in values.convert_to_item_value_list():
             if v.value is not None:
                 with self._session.post(url=f"{self._oh_host}/rest/items/{v.oh_item}", data=str(v.value)) as response:
                    if response.status_code != http.HTTPStatus.OK:
@@ -35,3 +37,20 @@ class OpenhabConnection():
                     else:
                         values.append(OhItemAndValue(item, response.text.split()[0]))
         return create_smart_meter_values(values)
+
+    def get_median_from_items(self, oh_items : List[str], timedelta : datetime.timedelta = datetime.timedelta(hours=1)) -> SmartMeterValues:
+        smart_meter_values : List[OhItemAndValue] = []
+        end_time=datetime.datetime.now()
+        start_time=end_time-timedelta
+        for item in oh_items:
+            with self._session.get(
+                url=f"{self._oh_host}/rest/persistence/items/{item}", 
+                params={'starttime': start_time.isoformat(), 'endtime': end_time.isoformat()}) as response:
+                if response.status_code != http.HTTPStatus.OK:
+                    self._logger.warning(f"Failed to get average value from openhab item {item}. Return code: {response.status_code}. text: {response.text})")
+                else:
+                    item_values = [float(data['state']) for data in response.json()['data']]
+                    avg_value = median(item_values) if len(item_values) > 10 else None
+                    smart_meter_values.append(OhItemAndValue(item, avg_value))
+        return create_smart_meter_values(smart_meter_values)
+

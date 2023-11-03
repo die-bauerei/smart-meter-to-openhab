@@ -44,7 +44,7 @@ class TestOpenhab(unittest.TestCase):
         TestOpenhab.smart_meter_values.overall_consumption.value=600
         TestOpenhab.smart_meter_values.electricity_meter.value=2.5
         TestOpenhab.oh_connection.post_to_items(TestOpenhab.smart_meter_values)
-        new_values = TestOpenhab.oh_connection.get_from_items(TestOpenhab.smart_meter_values.convert_to_oh_item_list())
+        new_values = TestOpenhab.oh_connection.get_from_items(SmartMeterValues.oh_item_names)
         self.assertEqual(new_values, TestOpenhab.smart_meter_values)
 
 if __name__ == '__main__':
