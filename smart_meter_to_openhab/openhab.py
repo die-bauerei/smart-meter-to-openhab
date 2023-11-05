@@ -38,7 +38,7 @@ class OpenhabConnection():
                         values.append(OhItemAndValue(item, response.text.split()[0]))
         return create_smart_meter_values(values)
 
-    def get_median_from_items(self, oh_items : List[str], timedelta : datetime.timedelta = datetime.timedelta(hours=1)) -> SmartMeterValues:
+    def get_median_from_items(self, oh_items : List[str], timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:
         smart_meter_values : List[OhItemAndValue] = []
         end_time=datetime.datetime.now()
         start_time=end_time-timedelta

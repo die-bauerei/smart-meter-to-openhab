@@ -27,9 +27,25 @@ python3 -m pip install --upgrade pip setuptools
 ```bash
 pip install smart_meter_to_openhab-0.1.2.tar.gz
 ```
-6. Run smart_meter_to_openhab with e.g.
+6. Provide needed environment variables. You can e.g. pass a .env file to smart_meter_to_openhab via the option *--dotenv_path*. Or provide them by any other means (e.g. in your ~/.profile).
 ```bash
-nohup python ~/smart_meter_py_env/lib/python3.11/site-packages/smart_meter_to_openhab_scripts/main.py --logfile ~/smart_meter.log --verbose &
+# Hostname or ip (https is not supported at the moment)
+OH_HOST='<http://your_ip:your_port'
+#openhab user (or token) for login (optional)
+OH_USER=''
+#openhab password for login (optional)
+OH_PASSWD=''
+#openhab item names
+PHASE_1_CONSUMPTION_OH_ITEM='smart_meter_phase_1_consumption'
+PHASE_2_CONSUMPTION_OH_ITEM='smart_meter_phase_2_consumption'
+PHASE_3_CONSUMPTION_OH_ITEM='smart_meter_phase_3_consumption'
+OVERALL_CONSUMPTION_OH_ITEM='smart_meter_overall_consumption'
+ELECTRICITY_METER_OH_ITEM='smart_meter_electricity_meter'
+```
+
+7. Run smart_meter_to_openhab with e.g.
+```bash
+nohup smart_meter_to_openhab --logfile ~/smart_meter.log --verbose &
 ```
 
 ## Autostart after reboot ##
@@ -45,7 +61,7 @@ Type=simple
 User=openhab
 Group=openhab
 UMask=002
-ExecStart=python ~/smart_meter_py_env/lib/python3.11/site-packages/smart_meter_to_openhab_scripts/main.py --logfile ~/smart_meter.log
+ExecStart=/usr/bin/bash -lc "/home/openhab/smart_meter_py_env/bin/smart_meter_to_openhab --logfile /home/openhab/smart_meter.log --verbose"
 
 [Install]
 WantedBy=multi-user.target

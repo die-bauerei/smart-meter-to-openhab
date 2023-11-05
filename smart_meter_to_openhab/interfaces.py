@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import List, Any, ClassVar
+from statistics import mean
 import os
 
 # NOTE: This is not a dataclass because of this: #https://www.micahsmith.com/blog/2020/01/dataclasses-mutable-defaults/
@@ -53,4 +54,13 @@ def create_smart_meter_values(values : List[OhItemAndValue]) -> SmartMeterValues
             smart_meter_values.overall_consumption.value = v.value
         elif v.oh_item == smart_meter_values.electricity_meter.oh_item:
             smart_meter_values.electricity_meter.value = v.value
+    return smart_meter_values
+
+def create_avg_smart_meter_values(values : List[SmartMeterValues]) -> SmartMeterValues:
+    smart_meter_values=SmartMeterValues()
+    smart_meter_values.phase_1_consumption.value = mean([value.phase_1_consumption.value for value in values])
+    smart_meter_values.phase_2_consumption.value = mean([value.phase_2_consumption.value for value in values])
+    smart_meter_values.phase_3_consumption.value = mean([value.phase_3_consumption.value for value in values])
+    smart_meter_values.overall_consumption.value = mean([value.overall_consumption.value for value in values])
+    smart_meter_values.electricity_meter.value = mean([value.electricity_meter.value for value in values])
     return smart_meter_values

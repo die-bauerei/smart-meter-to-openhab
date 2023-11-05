@@ -43,7 +43,7 @@ def main() -> None:
         logger.info("Connections established. Starting to transfer smart meter values to openhab.")
         while True:
             logger.info("Reading SML data")
-            values = sml_reader.read_from_sml()
+            values = sml_reader.read_and_validate_from_sml(oh_connection=oh_connection)
             try:   
                 oh_connection.post_to_items(values)
             except requests.exceptions.RequestException as e:
