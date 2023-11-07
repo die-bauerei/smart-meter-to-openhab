@@ -2,15 +2,19 @@ import argparse
 import logging
 import sys
 import os
-import requests
 from pathlib import Path
 from time import sleep
 from dotenv import load_dotenv
 from typing import Union
 
-def create_logger(file : Union[str, None], level ) -> logging.Logger:
+try:
+    import importlib.metadata
+    __version__ = importlib.metadata.version('smart_meter_to_openhab')
+except:
+    __version__ = 'development'
+
+def create_logger(file : Union[str, None]) -> logging.Logger:
     logger = logging.getLogger('smart-meter-to-openhab')
-    logger.setLevel(level=level)
     log_handler : Union[logging.FileHandler, logging.StreamHandler] = logging.FileHandler(file) if file else logging.StreamHandler() 
     formatter = logging.Formatter("%(levelname)s: %(asctime)s: %(message)s")
     log_handler.setFormatter(formatter)
@@ -18,9 +22,11 @@ def create_logger(file : Union[str, None], level ) -> logging.Logger:
     return logger
 
 def create_args_parser() -> argparse.ArgumentParser:
-    parser=argparse.ArgumentParser(description="Pushing data of ISKRA MT175 smart meter to openhab")
+    parser=argparse.ArgumentParser(description=f"A tool to push data of ISKRA MT175 smart meter to openhab. Version {__version__}")
     parser.add_argument("--dotenv_path", type=Path, required=False, help=f"Provide the required environment variables in this .env file \
                         or by any other means (e.g. in your ~/.profile)")
+    parser.add_argument("-c", "--smart_meter_read_count", type=int, required=False, default=5, 
+                        help="Specifies the number of performed reads that are averaged per interval. Between each read is a sleep of 1 sec.")
     parser.add_argument("--interval_in_sec", type=int, required=False, default=10, help="Interval in which the data will be read and pushed")
     parser.add_argument("--logfile", type=Path, required=False, help="Write logging to this file instead of to stdout")
     parser.add_argument('-v', '--verbose', action='store_true')
@@ -31,11 +37,15 @@ def main() -> None:
     args = parser.parse_args()
     if args.dotenv_path:
         load_dotenv(dotenv_path=args.dotenv_path)
-    logger=create_logger(args.logfile, logging.INFO if args.verbose else logging.WARN)
+    logger=create_logger(args.logfile)
+    logger.setLevel(logging.INFO)
+    logger.info(f"Starting smart_meter_to_openhab version {__version__}")
+    logger.setLevel(logging.INFO if args.verbose else logging.WARN)
     try:
         sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
         from smart_meter_to_openhab.openhab import OpenhabConnection
         from smart_meter_to_openhab.sml_iskra_mt175 import SmlReader
+        from smart_meter_to_openhab.interfaces import SmartMeterValues
         oh_user=os.getenv('OH_USER') if 'OH_USER' in os.environ else ''
         oh_passwd=os.getenv('OH_PASSWD') if 'OH_PASSWD' in os.environ else ''
         oh_connection = OpenhabConnection(os.getenv('OH_HOST'), oh_user, oh_passwd, logger) # type: ignore
@@ -43,11 +53,9 @@ def main() -> None:
         logger.info("Connections established. Starting to transfer smart meter values to openhab.")
         while True:
             logger.info("Reading SML data")
-            values = sml_reader.read_and_validate_from_sml(oh_connection=oh_connection)
-            try:   
-                oh_connection.post_to_items(values)
-            except requests.exceptions.RequestException as e:
-                logger.warning("Caught Exception: " + str(e))
+            ref_smart_meter_value=oh_connection.get_median_from_items(SmartMeterValues.oh_item_names)
+            values=sml_reader.read_avg_from_sml(args.smart_meter_read_count, ref_smart_meter_value)
+            oh_connection.post_to_items(values)
             logger.info(f"current values: L1={values.phase_1_consumption.value} L2={values.phase_2_consumption.value} "\
                         f"L3={values.phase_3_consumption.value} Overall={values.overall_consumption.value} E={values.electricity_meter.value}")
             sleep(args.interval_in_sec)

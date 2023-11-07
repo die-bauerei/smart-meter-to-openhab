@@ -12,11 +12,11 @@ class OhItemAndValue():
 @dataclass
 class SmartMeterValues():
     oh_item_names : ClassVar[List[str]] = [
-        os.getenv('PHASE_1_CONSUMPTION_OH_ITEM') if 'PHASE_1_CONSUMPTION_OH_ITEM' in os.environ else '',
-        os.getenv('PHASE_2_CONSUMPTION_OH_ITEM') if 'PHASE_2_CONSUMPTION_OH_ITEM' in os.environ else '',
-        os.getenv('PHASE_3_CONSUMPTION_OH_ITEM') if 'PHASE_3_CONSUMPTION_OH_ITEM' in os.environ else '',
-        os.getenv('OVERALL_CONSUMPTION_OH_ITEM') if 'OVERALL_CONSUMPTION_OH_ITEM' in os.environ else '',
-        os.getenv('ELECTRICITY_METER_OH_ITEM') if 'ELECTRICITY_METER_OH_ITEM' in os.environ else '']
+        os.getenv('PHASE_1_CONSUMPTION_OH_ITEM', default=''),
+        os.getenv('PHASE_2_CONSUMPTION_OH_ITEM', default=''),
+        os.getenv('PHASE_3_CONSUMPTION_OH_ITEM', default=''),
+        os.getenv('OVERALL_CONSUMPTION_OH_ITEM', default=''),
+        os.getenv('ELECTRICITY_METER_OH_ITEM', default='')]
     phase_1_consumption : OhItemAndValue = OhItemAndValue(oh_item_names[0])
     phase_2_consumption : OhItemAndValue = OhItemAndValue(oh_item_names[1])
     phase_3_consumption : OhItemAndValue = OhItemAndValue(oh_item_names[2])
@@ -58,9 +58,19 @@ def create_smart_meter_values(values : List[OhItemAndValue]) -> SmartMeterValues
 
 def create_avg_smart_meter_values(values : List[SmartMeterValues]) -> SmartMeterValues:
     smart_meter_values=SmartMeterValues()
-    smart_meter_values.phase_1_consumption.value = mean([value.phase_1_consumption.value for value in values])
-    smart_meter_values.phase_2_consumption.value = mean([value.phase_2_consumption.value for value in values])
-    smart_meter_values.phase_3_consumption.value = mean([value.phase_3_consumption.value for value in values])
-    smart_meter_values.overall_consumption.value = mean([value.overall_consumption.value for value in values])
-    smart_meter_values.electricity_meter.value = mean([value.electricity_meter.value for value in values])
+    phase_1_value_list = [value.phase_1_consumption.value for value in values if value.phase_1_consumption.value is not None]
+    if phase_1_value_list: 
+        smart_meter_values.phase_1_consumption.value = mean(phase_1_value_list)
+    phase_2_value_list = [value.phase_2_consumption.value for value in values if value.phase_2_consumption.value is not None]
+    if phase_2_value_list: 
+        smart_meter_values.phase_2_consumption.value = mean(phase_2_value_list)
+    phase_3_value_list = [value.phase_3_consumption.value for value in values if value.phase_3_consumption.value is not None]
+    if phase_3_value_list: 
+        smart_meter_values.phase_3_consumption.value = mean(phase_3_value_list)
+    overall_consumption_value_list = [value.overall_consumption.value for value in values if value.overall_consumption.value is not None]
+    if overall_consumption_value_list: 
+        smart_meter_values.overall_consumption.value = mean(overall_consumption_value_list)
+    electricity_meter_value_list = [value.electricity_meter.value for value in values if value.electricity_meter.value is not None]
+    if electricity_meter_value_list: 
+        smart_meter_values.electricity_meter.value = mean(electricity_meter_value_list)
     return smart_meter_values
