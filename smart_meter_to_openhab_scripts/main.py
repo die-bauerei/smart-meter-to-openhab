@@ -55,9 +55,10 @@ def main() -> None:
             logger.info("Reading SML data")
             ref_smart_meter_value=oh_connection.get_median_from_items(SmartMeterValues.oh_item_names)
             values=sml_reader.read_avg_from_sml(args.smart_meter_read_count, ref_smart_meter_value)
-            oh_connection.post_to_items(values)
             logger.info(f"current values: L1={values.phase_1_consumption.value} L2={values.phase_2_consumption.value} "\
                         f"L3={values.phase_3_consumption.value} Overall={values.overall_consumption.value} E={values.electricity_meter.value}")
+            oh_connection.post_to_items(values)
+            logger.info("Values posted to openHAB")
             sleep(args.interval_in_sec)
     except Exception as e:
         logger.exception("Caught Exception: " + str(e))

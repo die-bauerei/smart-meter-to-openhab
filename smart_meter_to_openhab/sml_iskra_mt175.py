@@ -7,7 +7,7 @@ from .interfaces import SmartMeterValues, create_avg_smart_meter_values
 
 def _has_outlier(value_list : List[Any], ref_value_list : List[Any]) -> bool:
     for i in range(len(value_list)):
-        if ref_value_list[i] is not None and value_list[i]*0.01 > ref_value_list[i]:
+        if ref_value_list[i] is not None and value_list[i]*0.001 > ref_value_list[i]:
             return True
     return False
 
@@ -77,7 +77,7 @@ class SmlReader():
         max_read_count : int
             specifies the number of performed reads to get a valid read
         ref_values : SmartMeterValues
-            Values that are used as baseline. If a new read value is 100 times higher as the given reference value, 
+            Values that are used as baseline. If a new read value is 1000 times higher as the given reference value, 
             it is considered as outlier and will be ignored.
 
         Returns
