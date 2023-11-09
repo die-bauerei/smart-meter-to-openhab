@@ -3,7 +3,7 @@ Pushing data of ISKRA MT175 smart meter to openhab.
 For a connection to the Smart meter you need a USB infrared adapter. There are several adapters on the market (e.g. https://weidmann-elektronik.de/Produkt_IR-Kopf.html) that just need to be pluged in. They are usually detected as a casual serial port (/dev/ttyUSB0)
 
 ## Installation ##
-The python package can be downloaded from the github releases (e.g. *smart_meter_to_openhab-0.1.3.tar.gz*)
+The python package can be downloaded from the github releases (e.g. *smart_meter_to_openhab-0.1.4.tar.gz*)
 It as advisable to use the same python version as specfied in the pyproject.toml.
 Follow the process in *install-poetry.sh* 
 
@@ -25,7 +25,7 @@ python3 -m pip install --upgrade pip setuptools
 ```
 5. Install smart_meter_to_openhab
 ```bash
-pip install smart_meter_to_openhab-0.1.3.tar.gz
+pip install smart_meter_to_openhab-0.1.4.tar.gz
 ```
 6. Provide needed environment variables. You can e.g. pass a .env file to smart_meter_to_openhab via the option *--dotenv_path*. Or provide them by any other means (e.g. in your ~/.profile).
 ```bash
