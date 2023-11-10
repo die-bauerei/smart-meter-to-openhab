@@ -14,11 +14,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v3
       - run: echo '::notice::Check out repository'
-      - name: Set up python 3.11
+      - name: Set up python 3.11.0
         id: setup-python
         uses: actions/setup-python@v3
         with:
-          python-version: '3.11'
+          python-version: '3.11.0'
       - run: echo '::notice::Set up python'
 
       - name: Install Poetry
