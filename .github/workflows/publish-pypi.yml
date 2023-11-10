@@ -30,7 +30,7 @@ jobs:
       - run: echo '::notice::Install poetry'
       
       - name: Build a binary wheel and a source tarball
-        run: poetry build
+        run: source .ven/bin/activate && poetry build
       - run: echo '::notice::Build package'
 
       - name: Publish distribution to PyPI
