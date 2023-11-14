@@ -5,9 +5,10 @@ from logging import Logger
 from typing import List, Any
 from .interfaces import SmartMeterValues, create_avg_smart_meter_values
 
+MIN_REF_VALUE_IN_WATT=50
 def _has_outlier(value_list : List[Any], ref_value_list : List[Any]) -> bool:
     for i in range(len(value_list)):
-        if ref_value_list[i] is not None and value_list[i]*0.001 > ref_value_list[i]:
+        if ref_value_list[i] is not None and value_list[i]*0.001 > max(ref_value_list[i], MIN_REF_VALUE_IN_WATT):
             return True
     return False
 
@@ -33,36 +34,41 @@ class SmlReader():
         data = ''
         smart_meter_values=SmartMeterValues()
         time_start=datetime.now()
-        while (datetime.now() - time_start) <= time_out:
-            input : bytes = self._port.read()
-            data += input.hex()          # Convert Bytes to Hex String to use find function for easy parsing
+        try:
+            while (datetime.now() - time_start) <= time_out:
+                input : bytes = self._port.read()
+                data += input.hex()          # Convert Bytes to Hex String to use find function for easy parsing
 
-            pos = data.find('1b1b1b1b01010101')        # find start of Frame
+                pos = data.find('1b1b1b1b01010101')        # find start of Frame
 
-            if (pos != -1):
-                data = data[pos:]                      # cut trash before start delimiter
+                if (pos != -1):
+                    data = data[pos:]                      # cut trash before start delimiter
 
-            pos = data.find('1b1b1b1b1a')              # find end of Frame
+                pos = data.find('1b1b1b1b1a')              # find end of Frame
 
-            if (pos != -1) and len(data) >= pos + 16:
-                data = data[0:pos + 16]                # cut trash after end delimiter
-                
-                pos = data.find('070100010800ff') # looking for OBIS Code: 1-0:1.8.0*255 - Energy kWh
-                smart_meter_values.electricity_meter.value = int(data[pos+36:pos + 52], 16) / 1e4 if pos != -1 else None
+                if (pos != -1) and len(data) >= pos + 16:
+                    data = data[0:pos + 16]                # cut trash after end delimiter
+                    
+                    pos = data.find('070100010800ff') # looking for OBIS Code: 1-0:1.8.0*255 - Energy kWh
+                    smart_meter_values.electricity_meter.value = int(data[pos+36:pos + 52], 16) / 1e4 if pos != -1 else None
 
-                pos = data.find('070100100700ff') # looking for OBIS Code: 1-0:16.7.0*255 - Sum Power L1,L2,L3
-                smart_meter_values.overall_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
+                    pos = data.find('070100100700ff') # looking for OBIS Code: 1-0:16.7.0*255 - Sum Power L1,L2,L3
+                    smart_meter_values.overall_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
 
-                pos = data.find('070100240700ff') # looking for OBIS Code: 1-0:36.7.0*255 - current Power L1
-                smart_meter_values.phase_1_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
+                    pos = data.find('070100240700ff') # looking for OBIS Code: 1-0:36.7.0*255 - current Power L1
+                    smart_meter_values.phase_1_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
 
-                pos = data.find('070100380700ff') # looking for OBIS Code: 1-0:56.7.0*255 - current Power L2
-                smart_meter_values.phase_2_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
+                    pos = data.find('070100380700ff') # looking for OBIS Code: 1-0:56.7.0*255 - current Power L2
+                    smart_meter_values.phase_2_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
 
-                pos = data.find('0701004c0700ff') # looking for OBIS Code: 1-0:76.7.0*255 - current Power L3
-                smart_meter_values.phase_3_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
+                    pos = data.find('0701004c0700ff') # looking for OBIS Code: 1-0:76.7.0*255 - current Power L3
+                    smart_meter_values.phase_3_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
 
-                break
+                    break
+        except serial.SerialException as e:
+            self._logger.warning("Caught Exception: " + str(e))
+            self._logger.warning("Returning None values.")
+            smart_meter_values.reset()
         
         if (datetime.now() - time_start) > time_out:
             self._logger.warning(f"Exceeded time out of {time_out} while reading from smart meter.")
