@@ -68,6 +68,9 @@ class SmlReader():
         except serial.SerialException as e:
             self._logger.warning("Caught Exception: " + str(e))
             self._logger.warning("Returning None values.")
+            self._port.close()
+            sleep(5)
+            self._port.open()
             smart_meter_values.reset()
         
         if (datetime.now() - time_start) > time_out:
