@@ -13,13 +13,11 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
-      - run: echo '::notice::Check out repository'
       - name: Set up python 3.11
         id: setup-python
         uses: actions/setup-python@v3
         with:
           python-version: '3.11'
-      - run: echo '::notice::Set up python'
 
       - name: Install Poetry
         uses: snok/install-poetry@v1
@@ -27,11 +25,9 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
           installer-parallel: true
-      - run: echo '::notice::Install poetry'
       
       - name: Build a binary wheel and a source tarball
         run: poetry build
-      - run: echo '::notice::Build package'
 
       - name: Publish distribution to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

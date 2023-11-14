@@ -3,7 +3,7 @@ Pushing data of ISKRA MT175 smart meter to openhab.
 For a connection to the Smart meter you need a USB infrared adapter. There are several adapters on the market (e.g. https://weidmann-elektronik.de/Produkt_IR-Kopf.html) that just need to be pluged in. They are usually detected as a casual serial port (/dev/ttyUSB0)
 
 ## Installation ##
-The python package can be downloaded from the github releases (e.g. *smart_meter_to_openhab-0.1.4.tar.gz*)
+The python package can be installed from PyPi (https://pypi.org/project/smart-meter-to-openhab/)
 It as advisable to use the same python version as specfied in the pyproject.toml.
 Follow the process in *install-poetry.sh* 
 
@@ -23,11 +23,11 @@ source smart_meter_py_env/bin/activate
 ```bash
 python3 -m pip install --upgrade pip setuptools
 ```
-5. Install smart_meter_to_openhab
+5. Install smart-meter-to-openhab
 ```bash
-pip install smart_meter_to_openhab-0.1.4.tar.gz
+pip install smart-meter-to-openhab
 ```
-6. Provide needed environment variables. You can e.g. pass a .env file to smart_meter_to_openhab via the option *--dotenv_path*. Or provide them by any other means (e.g. in your ~/.profile).
+6. Provide needed environment variables. You can e.g. pass a .env file to smart-meter-to-openhab via the option *--dotenv_path*. Or provide them by any other means (e.g. in your ~/.profile).
 ```bash
 # Hostname or ip (https is not supported at the moment)
 OH_HOST='<http://your_ip:your_port'
@@ -43,7 +43,7 @@ OVERALL_CONSUMPTION_OH_ITEM='smart_meter_overall_consumption'
 ELECTRICITY_METER_OH_ITEM='smart_meter_electricity_meter'
 ```
 
-7. Run smart_meter_to_openhab with e.g.
+7. Run smart-meter-to-openhab with e.g.
 ```bash
 nohup smart_meter_to_openhab --logfile ~/smart_meter.log --verbose &
 ```
@@ -73,7 +73,7 @@ sudo systemctl --system daemon-reload
 sudo systemctl enable smart_meter_to_openhab.service
 ```
 
-It is now possible to start, stop, restart and check the status of smart_meter_to_openhab with:
+It is now possible to start, stop, restart and check the status of smart-meter-to-openhab with:
 ```bash
 sudo systemctl start smart_meter_to_openhab.service
 sudo systemctl stop smart_meter_to_openhab.service
