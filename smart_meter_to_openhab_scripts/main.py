@@ -44,19 +44,22 @@ def main() -> None:
     try:
         sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
         from smart_meter_to_openhab.openhab import OpenhabConnection
-        from smart_meter_to_openhab.sml_iskra_mt175 import SmlReader
+        from smart_meter_to_openhab.sml_iskra_mt175 import SmlIskraMt175
+        from smart_meter_to_openhab.sml_reader import SmlReader
         from smart_meter_to_openhab.interfaces import SmartMeterValues
         oh_user=os.getenv('OH_USER') if 'OH_USER' in os.environ else ''
         oh_passwd=os.getenv('OH_PASSWD') if 'OH_PASSWD' in os.environ else ''
         oh_connection = OpenhabConnection(os.getenv('OH_HOST'), oh_user, oh_passwd, logger) # type: ignore
-        sml_reader = SmlReader('/dev/ttyUSB0', logger)
+        sml_iskra = SmlIskraMt175('/dev/ttyUSB0', logger)
+        sml_reader = SmlReader(logger)
         logger.info("Connections established. Starting to transfer smart meter values to openhab.")
         while True:
             logger.info("Reading SML data")
             ref_smart_meter_value=oh_connection.get_median_from_items(SmartMeterValues.oh_item_names)
-            values=sml_reader.read_avg_from_sml(args.smart_meter_read_count, ref_smart_meter_value)
+            values=sml_reader.read_avg_from_sml_and_compute_wh(sml_iskra.read, args.smart_meter_read_count, ref_smart_meter_value)
             logger.info(f"current values: L1={values.phase_1_consumption.value} L2={values.phase_2_consumption.value} "\
-                        f"L3={values.phase_3_consumption.value} Overall={values.overall_consumption.value} E={values.electricity_meter.value}")
+                        f"L3={values.phase_3_consumption.value} Overall={values.overall_consumption.value}"\
+                        f"Overall(Wh)={values.overall_consumption_wh.value} E={values.electricity_meter.value}")
             oh_connection.post_to_items(values)
             logger.info("Values posted to openHAB")
             sleep(args.interval_in_sec)
