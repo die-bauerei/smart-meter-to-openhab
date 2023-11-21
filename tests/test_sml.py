@@ -31,7 +31,7 @@ class TestSml(unittest.TestCase):
 
     def test_read(self) -> None:
         TestSml._function_call_count=0
-        TestSml._test_values[0]=SmartMeterValues.create(100, 200, 300, 600, 0.6, 2.5)
+        TestSml._test_values[0]=SmartMeterValues.create(100, 200, 300, 600, 2.5)
         reader=SmlReader(logger)
         read_values=reader.read_from_sml(read_func=TestSml._return_test_values, max_read_count=1)
         self.assertEqual(TestSml._test_values[0], read_values)
@@ -39,28 +39,28 @@ class TestSml(unittest.TestCase):
         TestSml._function_call_count=0
         TestSml._test_values[0].phase_1_consumption.value=None
         read_values=reader.read_from_sml(read_func=TestSml._return_test_values, max_read_count=1)
-        self.assertTrue(all(value is None for value in read_values.convert_to_measurement_value_list()))
+        self.assertTrue(all(value is None for value in read_values.convert_to_value_list()))
 
     def test_read_with_ref_values(self) -> None:
         TestSml._function_call_count=0
-        TestSml._test_values[0]=SmartMeterValues.create(100, 200, 300, 600, 0.6, 2.5)
+        TestSml._test_values[0]=SmartMeterValues.create(100, 200, 300, 600, 2.5)
         reader=SmlReader(logger)
-        ref_values=SmartMeterValues.create(50, 50, 50, 50, 50, 50)
+        ref_values=SmartMeterValues.create(50, 50, 50, 50, 50)
         read_values=reader.read_from_sml(read_func=TestSml._return_test_values, max_read_count=1, ref_values=ref_values)
         self.assertEqual(TestSml._test_values[0], read_values)
         # If there is an outlier, all return values should be None
         TestSml._function_call_count=0
         TestSml._test_values[0].phase_1_consumption.value=1000000
         read_values=reader.read_from_sml(read_func=TestSml._return_test_values, max_read_count=1, ref_values=ref_values)
-        self.assertTrue(all(value is None for value in read_values.convert_to_measurement_value_list()))
+        self.assertTrue(all(value is None for value in read_values.convert_to_value_list()))
 
     def test_read_avg(self) -> None:
         TestSml._function_call_count=0
-        TestSml._test_values[0]=SmartMeterValues.create(100, 200, 300, 600, 0.6, 2.5)
-        TestSml._test_values[1]=SmartMeterValues.create(200, 300, 400, 700, 1.2, 4.5)
+        TestSml._test_values[0]=SmartMeterValues.create(100, 200, 300, 600, 2.5)
+        TestSml._test_values[1]=SmartMeterValues.create(200, 300, 400, 700, 4.5)
         reader=SmlReader(logger)
         read_values=reader.read_avg_from_sml(read_func=TestSml._return_test_values, read_count=1)
-        self.assertEqual(SmartMeterValues.create(150, 250, 350, 650, 0.9, 3.5), read_values)
+        self.assertEqual(SmartMeterValues.create(150, 250, 350, 650, 3.5), read_values)
 
 if __name__ == '__main__':
     try:

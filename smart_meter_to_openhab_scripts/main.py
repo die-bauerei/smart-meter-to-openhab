@@ -56,11 +56,13 @@ def main() -> None:
         while True:
             logger.info("Reading SML data")
             ref_smart_meter_value=oh_connection.get_median_from_items(SmartMeterValues.oh_item_names)
-            values=sml_reader.read_avg_from_sml_and_compute_wh(sml_iskra.read, args.smart_meter_read_count, ref_smart_meter_value)
+            values, extended_values=sml_reader.read_avg_from_sml_and_compute_extended_values(
+                sml_iskra.read, args.smart_meter_read_count, ref_smart_meter_value)
             logger.info(f"current values: L1={values.phase_1_consumption.value} L2={values.phase_2_consumption.value} "\
-                        f"L3={values.phase_3_consumption.value} Overall={values.overall_consumption.value}"\
-                        f"Overall(Wh)={values.overall_consumption_wh.value} E={values.electricity_meter.value}")
+                        f"L3={values.phase_3_consumption.value} Overall={values.overall_consumption.value} E={values.electricity_meter.value}")
+            logger.info(f"current extended values: Overall(Wh)={extended_values.overall_consumption_wh.value}")
             oh_connection.post_to_items(values)
+            oh_connection.post_to_items(extended_values)
             logger.info("Values posted to openHAB")
             sleep(args.interval_in_sec)
     except Exception as e:

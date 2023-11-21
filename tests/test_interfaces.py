@@ -20,25 +20,29 @@ class TestInterfaces(unittest.TestCase):
             load_dotenv(dotenv_path=f"{package_path}/.env")
 
     def test_classvar(self) -> None:
-        self.assertTrue('smart_meter_phase_1_consumption' in SmartMeterValues.oh_item_names)
-        self.assertTrue('smart_meter_phase_2_consumption' in SmartMeterValues.oh_item_names)
-        self.assertTrue('smart_meter_phase_3_consumption' in SmartMeterValues.oh_item_names)
-        self.assertTrue('smart_meter_overall_consumption' in SmartMeterValues.oh_item_names)
-        self.assertTrue('smart_meter_overall_consumption_wh' in SmartMeterValues.oh_item_names)
-        self.assertTrue('smart_meter_electricity_meter' in SmartMeterValues.oh_item_names)
+        self.assertTrue('unit_tests_smart_meter_phase_1_consumption' in SmartMeterValues.oh_item_names)
+        self.assertTrue('unit_tests_smart_meter_phase_2_consumption' in SmartMeterValues.oh_item_names)
+        self.assertTrue('unit_tests_smart_meter_phase_3_consumption' in SmartMeterValues.oh_item_names)
+        self.assertTrue('unit_tests_smart_meter_overall_consumption' in SmartMeterValues.oh_item_names)
+        self.assertTrue('unit_tests_smart_meter_electricity_meter' in SmartMeterValues.oh_item_names)
+        self.assertTrue('unit_tests_smart_meter_overall_consumption_wh' in ExtendedSmartMeterValues.oh_item_names)
 
     def test_init(self) -> None:
         values=SmartMeterValues()
-        self.assertEqual(values.phase_1_consumption.oh_item, 'smart_meter_phase_1_consumption')
-        self.assertEqual(values.phase_2_consumption.oh_item, 'smart_meter_phase_2_consumption')
-        self.assertEqual(values.phase_3_consumption.oh_item, 'smart_meter_phase_3_consumption')
-        self.assertEqual(values.overall_consumption.oh_item, 'smart_meter_overall_consumption')
-        self.assertEqual(values.overall_consumption_wh.oh_item, 'smart_meter_overall_consumption_wh')
-        self.assertEqual(values.electricity_meter.oh_item, 'smart_meter_electricity_meter')
-        self.assertTrue(all(value is None for value in values.convert_to_measurement_value_list()))
+        extended_values=ExtendedSmartMeterValues()
+        self.assertEqual(values.phase_1_consumption.oh_item, 'unit_tests_smart_meter_phase_1_consumption')
+        self.assertEqual(values.phase_2_consumption.oh_item, 'unit_tests_smart_meter_phase_2_consumption')
+        self.assertEqual(values.phase_3_consumption.oh_item, 'unit_tests_smart_meter_phase_3_consumption')
+        self.assertEqual(values.overall_consumption.oh_item, 'unit_tests_smart_meter_overall_consumption')
+        self.assertEqual(extended_values.overall_consumption_wh.oh_item, 'unit_tests_smart_meter_overall_consumption_wh')
+        self.assertEqual(values.electricity_meter.oh_item, 'unit_tests_smart_meter_electricity_meter')
+        self.assertTrue(all(value is None for value in values.convert_to_value_list()))
+        self.assertTrue(all(value is None for value in extended_values.convert_to_value_list()))
+        self.assertEqual(len(values.convert_to_value_list()), 5)
+        self.assertEqual(len(extended_values.convert_to_value_list()), 1)
 
     def test_creation(self) -> None:
-        values=SmartMeterValues.create(100, 200, 300, 600, 0.6, 2.5)
+        values=SmartMeterValues.create(100, 200, 300, 600, 2.5)
         new_values=create_smart_meter_values(values.convert_to_item_value_list())
         self.assertEqual(values, new_values)
         values.phase_1_consumption.value=None
@@ -54,35 +58,37 @@ class TestInterfaces(unittest.TestCase):
         self.assertEqual(values, new_values)
 
     def test_creation_average(self) -> None:
-        values_1=SmartMeterValues.create(100, 200, 300, 600, 0.6, 2.5)
-        values_2=SmartMeterValues.create(200, 300, 400, 700, 1.0, 3.5)
+        values_1=SmartMeterValues.create(100, 200, 300, 600, 2.5)
+        values_2=SmartMeterValues.create(200, 300, 400, 700, 3.5)
         new_values=create_avg_smart_meter_values([values_1, values_2])
-        self.assertEqual(SmartMeterValues.create(150, 250, 350, 650, 0.8, 3.0), new_values)
+        self.assertEqual(SmartMeterValues.create(150, 250, 350, 650, 3.0), new_values)
 
-    def test_has_none(self) -> None:
-        values=SmartMeterValues.create(100, 200, 300, 600, 0.6, 2.5)
-        self.assertFalse(values.is_valid_measurement())
+    def test_is_invalid(self) -> None:
+        values=SmartMeterValues.create(100, 200, 300, 600, 2.5)
+        self.assertFalse(values.is_invalid())
         values.phase_1_consumption.value=None
-        self.assertTrue(values.is_valid_measurement())
+        self.assertTrue(values.is_invalid())
 
         # NOTE: Even unspecified values should be tested against None. Since we read all values from the smart meter, 
         #   no matter what will be actually posted to openHAB later on.
         os.environ['PHASE_1_CONSUMPTION_WATT_OH_ITEM']=''
-        values=SmartMeterValues.create(100, 200, 300, 600, 0.6, 2.5)
-        self.assertFalse(values.is_valid_measurement())
+        values=SmartMeterValues.create(100, 200, 300, 600, 2.5)
+        self.assertFalse(values.is_invalid())
         values.phase_1_consumption.value=None
-        self.assertTrue(values.is_valid_measurement())
+        self.assertTrue(values.is_invalid())
 
-        # NOTE: The value for watt/h is excluded since it is computed after reading from smart meter
-        values.phase_1_consumption.value=100
-        values.overall_consumption_wh.value=None
-        self.assertFalse(values.is_valid_measurement())
-    
-    def test_conversions(self) -> None:
-        values=SmartMeterValues.create(100, 200, 300, 600, 0.6, 2.5)
-        self.assertEqual(len(values.convert_to_item_value_list()), 6)
-        self.assertEqual(len(values.convert_to_measurement_item_value_list()), 5)
-        self.assertEqual(len(values.convert_to_measurement_value_list()), 5)
+        # NOTE: The value for watt/h is considered in the extended values
+        extended_values=ExtendedSmartMeterValues.create(0.5)
+        self.assertFalse(extended_values.is_invalid())
+        extended_values.overall_consumption_wh.value=None
+        self.assertTrue(extended_values.is_invalid())
+
+    def test_comparison(self) -> None:
+        values_1=SmartMeterValues.create(100, 200, 300, 600, 2.5)
+        values_2=SmartMeterValues.create(100, 200, 300, 600, 2.5)
+        self.assertEqual(values_1, values_2)
+        values_3=SmartMeterValues.create(200, 300, 400, 600, 2.5)
+        self.assertNotEqual(values_1, values_3)
         
 if __name__ == '__main__':
     try:

@@ -6,7 +6,9 @@ from requests.auth import HTTPBasicAuth
 from requests.adapters import HTTPAdapter, Retry
 from typing import List
 from statistics import median
-from .interfaces import SmartMeterValues, OhItemAndValue, create_smart_meter_values
+from .interfaces import (
+    SmartMeterValues, ExtendedSmartMeterValues, OhItemAndValueContainer, OhItemAndValue, 
+    create_smart_meter_values, create_extended_smart_meter_values)
 
 class OpenhabConnection():
     def __init__(self, oh_host : str, oh_user : str, oh_passwd : str, logger : Logger) -> None:
@@ -21,8 +23,8 @@ class OpenhabConnection():
         self._session.headers={'Content-Type': 'text/plain'}
         self._logger=logger
 
-    def post_to_items(self, values : SmartMeterValues) -> None:
-        for v in values.convert_to_item_value_list():
+    def post_to_items(self, value_container : OhItemAndValueContainer) -> None:
+        for v in value_container.convert_to_item_value_list():
             if v.value is not None and v.oh_item:
                 try:
                     with self._session.post(url=f"{self._oh_host}/rest/items/{v.oh_item}", data=str(v.value)) as response:
@@ -31,7 +33,7 @@ class OpenhabConnection():
                 except requests.exceptions.RequestException as e:
                     self._logger.warning("Caught Exception while posting to openHAB: " + str(e))
 
-    def get_from_items(self, oh_items : List[str]) -> SmartMeterValues:
+    def get_item_value_list_from_items(self, oh_items : List[str]) -> List[OhItemAndValue]:
         values : List[OhItemAndValue] = []
         for item in oh_items:
             if item:
@@ -44,7 +46,13 @@ class OpenhabConnection():
                 except requests.exceptions.RequestException as e:
                     self._logger.warning("Caught Exception while getting from openHAB: " + str(e))
                     values.append(OhItemAndValue(item))
-        return create_smart_meter_values(values)
+        return values
+
+    def get_values_from_items(self, oh_items : List[str]) -> SmartMeterValues:
+        return create_smart_meter_values(self.get_item_value_list_from_items(oh_items))
+    
+    def get_extended_values_from_items(self, oh_items : List[str]) -> ExtendedSmartMeterValues:
+        return create_extended_smart_meter_values(self.get_item_value_list_from_items(oh_items))
 
     def get_median_from_items(self, oh_items : List[str], timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:
         smart_meter_values : List[OhItemAndValue] = []
