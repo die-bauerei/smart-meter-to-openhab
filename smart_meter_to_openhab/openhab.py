@@ -6,9 +6,7 @@ from requests.auth import HTTPBasicAuth
 from requests.adapters import HTTPAdapter, Retry
 from typing import List
 from statistics import median
-from .interfaces import (
-    SmartMeterValues, ExtendedSmartMeterValues, OhItemAndValueContainer, OhItemAndValue, 
-    create_smart_meter_values, create_extended_smart_meter_values)
+from .interfaces import SmartMeterValues, ExtendedSmartMeterValues, OhItemAndValueContainer, OhItemAndValue
 
 class OpenhabConnection():
     def __init__(self, oh_host : str, oh_user : str, oh_passwd : str, logger : Logger) -> None:
@@ -42,17 +40,17 @@ class OpenhabConnection():
                         if response.status_code != http.HTTPStatus.OK:
                             self._logger.warning(f"Failed to get value from openhab item {item}. Return code: {response.status_code}. text: {response.text})")
                         else:
-                            values.append(OhItemAndValue(item, response.text.split()[0]))
+                            values.append(OhItemAndValue(item, float(response.text.split()[0])))
                 except requests.exceptions.RequestException as e:
                     self._logger.warning("Caught Exception while getting from openHAB: " + str(e))
                     values.append(OhItemAndValue(item))
         return values
 
     def get_values_from_items(self, oh_items : List[str]) -> SmartMeterValues:
-        return create_smart_meter_values(self.get_item_value_list_from_items(oh_items))
+        return SmartMeterValues.create(self.get_item_value_list_from_items(oh_items))
     
     def get_extended_values_from_items(self, oh_items : List[str]) -> ExtendedSmartMeterValues:
-        return create_extended_smart_meter_values(self.get_item_value_list_from_items(oh_items))
+        return ExtendedSmartMeterValues.create(self.get_item_value_list_from_items(oh_items))
 
     def get_median_from_items(self, oh_items : List[str], timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:
         smart_meter_values : List[OhItemAndValue] = []
@@ -73,5 +71,5 @@ class OpenhabConnection():
                 except requests.exceptions.RequestException as e:
                     self._logger.warning("Caught Exception while getting persistence data from openHAB: " + str(e))
                     smart_meter_values.append(OhItemAndValue(item))
-        return create_smart_meter_values(smart_meter_values)
+        return SmartMeterValues.create(smart_meter_values)
 

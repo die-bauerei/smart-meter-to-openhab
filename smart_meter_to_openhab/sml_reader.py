@@ -2,7 +2,7 @@ from time import sleep
 from datetime import datetime
 from logging import Logger
 from typing import List, Any, Tuple, Callable
-from .interfaces import SmartMeterValues, create_avg_smart_meter_values, ExtendedSmartMeterValues
+from .interfaces import SmartMeterValues, ExtendedSmartMeterValues
 from .utils import compute_watt_h
 
 MIN_REF_VALUE_IN_WATT=50
@@ -52,9 +52,7 @@ class SmlReader():
 
         value_list=values.convert_to_value_list()
         if values.is_invalid() or _has_outlier(value_list, ref_value_list):
-            self._logger.warning(f"Unable to read and validate SML data. Ignoring following values: "\
-                f"L1={values.phase_1_consumption.value} L2={values.phase_2_consumption.value} "\
-                f"L3={values.phase_3_consumption.value} Overall={values.overall_consumption.value} E={values.electricity_meter.value}")
+            self._logger.warning(f"Unable to read and validate SML data. Ignoring following values: {values}")
             values.reset()
 
         return values
@@ -86,7 +84,7 @@ class SmlReader():
             sleep(1)
         if len(all_values) < read_count:
             self._logger.warning(f"Expected {read_count} valid SML values but only received {len(all_values)}. Returning average value anyway.")
-        return create_avg_smart_meter_values(all_values)
+        return SmartMeterValues.create_avg(all_values)
     
     def read_avg_from_sml_and_compute_extended_values(self, read_func : SmlReadFunction, read_count : int, 
                           ref_values : SmartMeterValues = SmartMeterValues()) -> Tuple[SmartMeterValues, ExtendedSmartMeterValues]:

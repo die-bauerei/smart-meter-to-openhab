@@ -30,18 +30,18 @@ class TestOpenhab(unittest.TestCase):
 
     def setUp(self) -> None:
         # this is called before each test
-        values=SmartMeterValues.create(0, 0, 0, 0, 0)
+        values=SmartMeterValues(0, 0, 0, 0, 0)
         TestOpenhab.oh_connection.post_to_items(values)
-        extended_values=ExtendedSmartMeterValues.create(0)
+        extended_values=ExtendedSmartMeterValues(0)
         TestOpenhab.oh_connection.post_to_items(extended_values)
 
     def test_valid_values(self) -> None:
-        values=SmartMeterValues.create(100, 200, 300, 600, 2.5)
+        values=SmartMeterValues(100, 200, 300, 600, 2.5)
         TestOpenhab.oh_connection.post_to_items(values)
         new_values = TestOpenhab.oh_connection.get_values_from_items(SmartMeterValues.oh_item_names)
         self.assertEqual(new_values, values)
 
-        extended_values=ExtendedSmartMeterValues.create(0.6)
+        extended_values=ExtendedSmartMeterValues(0.6)
         TestOpenhab.oh_connection.post_to_items(extended_values)
         new_extended_values = TestOpenhab.oh_connection.get_extended_values_from_items(ExtendedSmartMeterValues.oh_item_names)
         self.assertEqual(new_extended_values, extended_values)
@@ -54,18 +54,18 @@ class TestOpenhab(unittest.TestCase):
         TestOpenhab.oh_connection.post_to_items(values)
         new_values = TestOpenhab.oh_connection.get_values_from_items(SmartMeterValues.oh_item_names)
         self.assertNotEqual(new_values, values)
-        values=SmartMeterValues.create(100, 0, 300, 600, 0)
+        values=SmartMeterValues(100, 0, 300, 600, 0)
         self.assertEqual(new_values, values)
 
         extended_values=ExtendedSmartMeterValues()
         TestOpenhab.oh_connection.post_to_items(extended_values)
         new_extended_values = TestOpenhab.oh_connection.get_extended_values_from_items(ExtendedSmartMeterValues.oh_item_names)
         self.assertNotEqual(new_extended_values, extended_values)
-        extended_values=ExtendedSmartMeterValues.create(0)
+        extended_values=ExtendedSmartMeterValues(0)
         self.assertEqual(new_extended_values, extended_values)
 
     def test_unspecified_oh_items(self) -> None:
-        values=SmartMeterValues.create(100, 200, 300, 600, 4.5)
+        values=SmartMeterValues(100, 200, 300, 600, 4.5)
         values.phase_1_consumption.value=100
         values.phase_2_consumption.oh_item=''
         values.phase_3_consumption.value=300
@@ -73,16 +73,20 @@ class TestOpenhab(unittest.TestCase):
         values.electricity_meter.oh_item=''
         TestOpenhab.oh_connection.post_to_items(values)
         new_values = TestOpenhab.oh_connection.get_values_from_items(SmartMeterValues.oh_item_names)
-        self.assertNotEqual(new_values, values)
-        values=SmartMeterValues.create(100, 0, 300, 600, 0)
-        self.assertNotEqual(new_values, values)
+        self.assertNotEqual(new_values, values) # different item names and values
+        values=SmartMeterValues(100, 200, 300, 600, 4.5)
+        self.assertNotEqual(new_values, values) # different values
+        values=SmartMeterValues(100, 0, 300, 600, 0)
+        self.assertEqual(new_values, values)
 
-        extended_values=ExtendedSmartMeterValues.create(0.6)
+        extended_values=ExtendedSmartMeterValues(0.6)
         extended_values.overall_consumption_wh.oh_item=''
         TestOpenhab.oh_connection.post_to_items(extended_values)
         new_extended_values = TestOpenhab.oh_connection.get_extended_values_from_items(ExtendedSmartMeterValues.oh_item_names)
-        self.assertNotEqual(new_extended_values, extended_values)
-        extended_values=ExtendedSmartMeterValues.create(0)
+        self.assertNotEqual(new_extended_values, extended_values) # different item names and values
+        extended_values=ExtendedSmartMeterValues(0.6)
+        self.assertNotEqual(new_extended_values, extended_values) # different values
+        extended_values=ExtendedSmartMeterValues(0)
         self.assertEqual(new_extended_values, extended_values)
 
 if __name__ == '__main__':
