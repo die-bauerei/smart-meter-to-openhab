@@ -55,7 +55,7 @@ def main() -> None:
         logger.info("Connections established. Starting to transfer smart meter values to openhab.")
         while True:
             logger.info("Reading SML data")
-            ref_smart_meter_value=oh_connection.get_median_from_items(SmartMeterValues.oh_item_names)
+            ref_smart_meter_value=oh_connection.get_median_from_items(list(SmartMeterValues._oh_items))
             values, extended_values=sml_reader.read_avg_from_sml_and_compute_extended_values(
                 sml_iskra.read, args.smart_meter_read_count, ref_smart_meter_value)
             logger.info(f"current values: {values}")

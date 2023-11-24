@@ -6,7 +6,7 @@ from requests.auth import HTTPBasicAuth
 from requests.adapters import HTTPAdapter, Retry
 from typing import List
 from statistics import median
-from .interfaces import SmartMeterValues, ExtendedSmartMeterValues, OhItemAndValueContainer, OhItemAndValue
+from .interfaces import SmartMeterValues, ExtendedSmartMeterValues, OhItemAndValueContainer, OhItemAndValue, OhItem
 
 class OpenhabConnection():
     def __init__(self, oh_host : str, oh_user : str, oh_passwd : str, logger : Logger) -> None:
@@ -31,7 +31,7 @@ class OpenhabConnection():
                 except requests.exceptions.RequestException as e:
                     self._logger.warning("Caught Exception while posting to openHAB: " + str(e))
 
-    def get_item_value_list_from_items(self, oh_items : List[str]) -> List[OhItemAndValue]:
+    def get_item_value_list_from_items(self, oh_items : List[OhItem]) -> List[OhItemAndValue]:
         values : List[OhItemAndValue] = []
         for item in oh_items:
             if item:
@@ -46,13 +46,13 @@ class OpenhabConnection():
                     values.append(OhItemAndValue(item))
         return values
 
-    def get_values_from_items(self, oh_items : List[str]) -> SmartMeterValues:
+    def get_values_from_items(self, oh_items : List[OhItem]) -> SmartMeterValues:
         return SmartMeterValues.create(self.get_item_value_list_from_items(oh_items))
     
-    def get_extended_values_from_items(self, oh_items : List[str]) -> ExtendedSmartMeterValues:
+    def get_extended_values_from_items(self, oh_items : List[OhItem]) -> ExtendedSmartMeterValues:
         return ExtendedSmartMeterValues.create(self.get_item_value_list_from_items(oh_items))
 
-    def get_median_from_items(self, oh_items : List[str], timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:
+    def get_median_from_items(self, oh_items : List[OhItem], timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:
         smart_meter_values : List[OhItemAndValue] = []
         end_time=datetime.datetime.now()
         start_time=end_time-timedelta

@@ -20,12 +20,12 @@ class TestInterfaces(unittest.TestCase):
             load_dotenv(dotenv_path=f"{package_path}/.env")
 
     def test_classvar(self) -> None:
-        self.assertTrue('unit_tests_smart_meter_phase_1_consumption' in SmartMeterValues.oh_item_names)
-        self.assertTrue('unit_tests_smart_meter_phase_2_consumption' in SmartMeterValues.oh_item_names)
-        self.assertTrue('unit_tests_smart_meter_phase_3_consumption' in SmartMeterValues.oh_item_names)
-        self.assertTrue('unit_tests_smart_meter_overall_consumption' in SmartMeterValues.oh_item_names)
-        self.assertTrue('unit_tests_smart_meter_electricity_meter' in SmartMeterValues.oh_item_names)
-        self.assertTrue('unit_tests_smart_meter_overall_consumption_wh' in ExtendedSmartMeterValues.oh_item_names)
+        self.assertTrue('unit_tests_smart_meter_phase_1_consumption' in SmartMeterValues._oh_items)
+        self.assertTrue('unit_tests_smart_meter_phase_2_consumption' in SmartMeterValues._oh_items)
+        self.assertTrue('unit_tests_smart_meter_phase_3_consumption' in SmartMeterValues._oh_items)
+        self.assertTrue('unit_tests_smart_meter_overall_consumption' in SmartMeterValues._oh_items)
+        self.assertTrue('unit_tests_smart_meter_electricity_meter' in SmartMeterValues._oh_items)
+        self.assertEqual('unit_tests_smart_meter_overall_consumption_wh', ExtendedSmartMeterValues._oh_item)
 
     def test_init(self) -> None:
         values=SmartMeterValues()

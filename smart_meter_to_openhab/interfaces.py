@@ -1,13 +1,29 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Any, Union
+from typing import List, Any, Union, Tuple
 from statistics import mean
 from abc import ABC, abstractmethod
 import os
 
+@dataclass(frozen=True, eq=False)
+class OhItem():
+    oh_item : str
+    def __eq__(self, other) -> bool:
+        if isinstance(other, OhItem):
+            return self.oh_item == other.oh_item
+        elif isinstance(other, str):
+            return self.oh_item == other
+        return False
+    
+    def __str__(self) -> str:
+        return self.oh_item
+    
+    def __bool__(self) -> bool:
+        return bool(self.oh_item)
+
 @dataclass
 class OhItemAndValue():
-    oh_item : str # TODO: set this to frozen (except in unit tests?)
+    oh_item : OhItem
     value : Union[float, None] = None
 
 class OhItemAndValueContainer(ABC):
@@ -27,22 +43,28 @@ class OhItemAndValueContainer(ABC):
             return self.convert_to_item_value_list() == other.convert_to_item_value_list()
         return False
 
+# NOTE: Use a tuple (immutable type) here to prevent changing the values 
+SmartMeterOhItems = Tuple[OhItem, OhItem, OhItem, OhItem, OhItem]
+def _read_smart_meter_env() -> SmartMeterOhItems:
+    return (OhItem(os.getenv('PHASE_1_CONSUMPTION_WATT_OH_ITEM', default='')),
+            OhItem(os.getenv('PHASE_2_CONSUMPTION_WATT_OH_ITEM', default='')),
+            OhItem(os.getenv('PHASE_3_CONSUMPTION_WATT_OH_ITEM', default='')),
+            OhItem(os.getenv('OVERALL_CONSUMPTION_WATT_OH_ITEM', default='')),
+            OhItem(os.getenv('ELECTRICITY_METER_KWH_OH_ITEM', default='')))
+
 class SmartMeterValues(OhItemAndValueContainer):
-    oh_item_names : List[str] = [
-        os.getenv('PHASE_1_CONSUMPTION_WATT_OH_ITEM', default=''),
-        os.getenv('PHASE_2_CONSUMPTION_WATT_OH_ITEM', default=''),
-        os.getenv('PHASE_3_CONSUMPTION_WATT_OH_ITEM', default=''),
-        os.getenv('OVERALL_CONSUMPTION_WATT_OH_ITEM', default=''),
-        os.getenv('ELECTRICITY_METER_KWH_OH_ITEM', default='')]
+    _oh_items : SmartMeterOhItems = _read_smart_meter_env()
     
     def __init__(self, phase_1_consumption : Union[float, None] = None, phase_2_consumption : Union[float, None] = None, 
                  phase_3_consumption : Union[float, None] = None, overall_consumption : Union[float, None] = None, 
-                 electricity_meter : Union[float, None] = None) -> None:
-        self.phase_1_consumption = OhItemAndValue(SmartMeterValues.oh_item_names[0], phase_1_consumption)
-        self.phase_2_consumption = OhItemAndValue(SmartMeterValues.oh_item_names[1], phase_2_consumption)
-        self.phase_3_consumption = OhItemAndValue(SmartMeterValues.oh_item_names[2], phase_3_consumption)
-        self.overall_consumption = OhItemAndValue(SmartMeterValues.oh_item_names[3], overall_consumption)
-        self.electricity_meter = OhItemAndValue(SmartMeterValues.oh_item_names[4], electricity_meter)
+                 electricity_meter : Union[float, None] = None, 
+                 user_specified_oh_items : Union[SmartMeterOhItems, None] = None) -> None:
+        oh_items = user_specified_oh_items if user_specified_oh_items is not None else SmartMeterValues._oh_items
+        self.phase_1_consumption = OhItemAndValue(oh_items[0], phase_1_consumption)
+        self.phase_2_consumption = OhItemAndValue(oh_items[1], phase_2_consumption)
+        self.phase_3_consumption = OhItemAndValue(oh_items[2], phase_3_consumption)
+        self.overall_consumption = OhItemAndValue(oh_items[3], overall_consumption)
+        self.electricity_meter = OhItemAndValue(oh_items[4], electricity_meter)
 
     def reset(self) -> None:
         self.phase_1_consumption.value = None
@@ -95,11 +117,16 @@ class SmartMeterValues(OhItemAndValueContainer):
             smart_meter_values.electricity_meter.value = mean(electricity_meter_value_list)
         return smart_meter_values
 
-class ExtendedSmartMeterValues(OhItemAndValueContainer):
-    oh_item_names : List[str] = [os.getenv('OVERALL_CONSUMPTION_WH_OH_ITEM', default='')]
+def _read_extended_smart_meter_env() -> OhItem:
+    return OhItem(os.getenv('OVERALL_CONSUMPTION_WH_OH_ITEM', default=''))
 
-    def __init__(self, overall_consumption_wh : Union[float, None] = None) -> None:
-        self.overall_consumption_wh = OhItemAndValue(ExtendedSmartMeterValues.oh_item_names[0], overall_consumption_wh)
+class ExtendedSmartMeterValues(OhItemAndValueContainer):
+    _oh_item : OhItem = _read_extended_smart_meter_env()
+
+    def __init__(self, overall_consumption_wh : Union[float, None] = None,
+                 user_specified_oh_item : Union[OhItem, None] = None) -> None:
+        oh_item = user_specified_oh_item if user_specified_oh_item is not None else ExtendedSmartMeterValues._oh_item
+        self.overall_consumption_wh = OhItemAndValue(oh_item, overall_consumption_wh)
 
     def convert_to_item_value_list(self) -> List[OhItemAndValue]:
         return [self.overall_consumption_wh]
