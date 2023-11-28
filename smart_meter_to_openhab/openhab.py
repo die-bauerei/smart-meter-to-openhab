@@ -4,9 +4,9 @@ import datetime
 from logging import Logger
 from requests.auth import HTTPBasicAuth
 from requests.adapters import HTTPAdapter, Retry
-from typing import List
+from typing import List, Tuple
 from statistics import median
-from .interfaces import SmartMeterValues, ExtendedSmartMeterValues, OhItemAndValueContainer, OhItemAndValue, OhItem
+from .interfaces import *
 
 class OpenhabConnection():
     def __init__(self, oh_host : str, oh_user : str, oh_passwd : str, logger : Logger) -> None:
@@ -31,9 +31,9 @@ class OpenhabConnection():
                 except requests.exceptions.RequestException as e:
                     self._logger.warning("Caught Exception while posting to openHAB: " + str(e))
 
-    def get_item_value_list_from_items(self, oh_items : List[OhItem]) -> List[OhItemAndValue]:
+    def get_item_value_list_from_items(self, oh_item_names : Tuple[str, ...]) -> List[OhItemAndValue]:
         values : List[OhItemAndValue] = []
-        for item in oh_items:
+        for item in oh_item_names:
             if item:
                 try:
                     with self._session.get(url=f"{self._oh_host}/rest/items/{item}/state") as response:
@@ -46,17 +46,17 @@ class OpenhabConnection():
                     values.append(OhItemAndValue(item))
         return values
 
-    def get_values_from_items(self, oh_items : List[OhItem]) -> SmartMeterValues:
-        return SmartMeterValues.create(self.get_item_value_list_from_items(oh_items))
+    def get_values_from_items(self, oh_item_names : SmartMeterOhItemNames) -> SmartMeterValues:
+        return SmartMeterValues.create(self.get_item_value_list_from_items(oh_item_names))
     
-    def get_extended_values_from_items(self, oh_items : List[OhItem]) -> ExtendedSmartMeterValues:
-        return ExtendedSmartMeterValues.create(self.get_item_value_list_from_items(oh_items))
+    def get_extended_values_from_items(self, oh_item_names : ExtendedSmartMeterOhItemNames) -> ExtendedSmartMeterValues:
+        return ExtendedSmartMeterValues.create(self.get_item_value_list_from_items(oh_item_names))
 
-    def get_median_from_items(self, oh_items : List[OhItem], timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:
+    def get_median_from_items(self, oh_item_names : SmartMeterOhItemNames, timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:
         smart_meter_values : List[OhItemAndValue] = []
         end_time=datetime.datetime.now()
         start_time=end_time-timedelta
-        for item in oh_items:
+        for item in oh_item_names:
             if item:
                 try:   
                     with self._session.get(

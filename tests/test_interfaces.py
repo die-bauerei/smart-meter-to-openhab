@@ -1,12 +1,7 @@
 import unittest
 import logging
 import sys
-import os
 
-from pathlib import Path
-package_path=Path(__file__).parent.parent.absolute()
-sys.path.insert(0, str(package_path))
-from dotenv import load_dotenv
 from smart_meter_to_openhab.interfaces import *
 
 logging.basicConfig(stream=sys.stdout, level=logging.ERROR)
@@ -14,18 +9,21 @@ logger = logging.getLogger(__name__)
 
 class TestInterfaces(unittest.TestCase):
 
-    # this is called before each test
-    def setUp(self) -> None:
-        if os.path.isfile(f"{package_path}/.env"):
-            load_dotenv(dotenv_path=f"{package_path}/.env")
+    def test_oh_item(self) -> None:
+        item=OhItem('')
+        self.assertFalse(item)
+        item=OhItem('test')
+        self.assertTrue(item)
+        self.assertEqual(item, 'test')
+        self.assertEqual(str(item), 'test')
 
     def test_classvar(self) -> None:
-        self.assertTrue('unit_tests_smart_meter_phase_1_consumption' in SmartMeterValues._oh_items)
-        self.assertTrue('unit_tests_smart_meter_phase_2_consumption' in SmartMeterValues._oh_items)
-        self.assertTrue('unit_tests_smart_meter_phase_3_consumption' in SmartMeterValues._oh_items)
-        self.assertTrue('unit_tests_smart_meter_overall_consumption' in SmartMeterValues._oh_items)
-        self.assertTrue('unit_tests_smart_meter_electricity_meter' in SmartMeterValues._oh_items)
-        self.assertEqual('unit_tests_smart_meter_overall_consumption_wh', ExtendedSmartMeterValues._oh_item)
+        self.assertTrue('unit_tests_smart_meter_phase_1_consumption' in SmartMeterValues.oh_item_names())
+        self.assertTrue('unit_tests_smart_meter_phase_2_consumption' in SmartMeterValues.oh_item_names())
+        self.assertTrue('unit_tests_smart_meter_phase_3_consumption' in SmartMeterValues.oh_item_names())
+        self.assertTrue('unit_tests_smart_meter_overall_consumption' in SmartMeterValues.oh_item_names())
+        self.assertTrue('unit_tests_smart_meter_electricity_meter' in SmartMeterValues.oh_item_names())
+        self.assertTrue('unit_tests_smart_meter_overall_consumption_wh' in ExtendedSmartMeterValues.oh_item_names())
 
     def test_init(self) -> None:
         values=SmartMeterValues()
@@ -50,11 +48,14 @@ class TestInterfaces(unittest.TestCase):
         self.assertEqual(values, new_values)
 
     def test_creation_not_all_items(self) -> None:
-        os.environ['PHASE_1_CONSUMPTION_WATT_OH_ITEM']=''
-        values=SmartMeterValues()
+        oh_item_names : SmartMeterOhItemNames = ('', SmartMeterValues.oh_item_names()[1], 
+                                                SmartMeterValues.oh_item_names()[2],
+                                                SmartMeterValues.oh_item_names()[3],
+                                                SmartMeterValues.oh_item_names()[4])
+        values=SmartMeterValues(None, None, None, None, None, oh_item_names)
         values.phase_2_consumption.value=200
         values.phase_3_consumption.value=300
-        new_values=SmartMeterValues.create(values.convert_to_item_value_list())
+        new_values=SmartMeterValues.create(values.convert_to_item_value_list(), oh_item_names)
         self.assertEqual(values, new_values)
 
     def test_creation_average(self) -> None:
@@ -71,8 +72,11 @@ class TestInterfaces(unittest.TestCase):
 
         # NOTE: Even unspecified values should be tested against None. Since we read all values from the smart meter, 
         #   no matter what will be actually posted to openHAB later on.
-        os.environ['PHASE_1_CONSUMPTION_WATT_OH_ITEM']=''
-        values=SmartMeterValues(100, 200, 300, 600, 2.5)
+        oh_item_names : SmartMeterOhItemNames = ('', SmartMeterValues.oh_item_names()[1], 
+                                                SmartMeterValues.oh_item_names()[2],
+                                                SmartMeterValues.oh_item_names()[3],
+                                                SmartMeterValues.oh_item_names()[4])
+        values=SmartMeterValues(100, 200, 300, 600, 2.5, oh_item_names)
         self.assertFalse(values.is_invalid())
         values.phase_1_consumption.value=None
         self.assertTrue(values.is_invalid())
@@ -89,6 +93,13 @@ class TestInterfaces(unittest.TestCase):
         self.assertEqual(values_1, values_2)
         values_3=SmartMeterValues(200, 300, 400, 600, 2.5)
         self.assertNotEqual(values_1, values_3)
+
+    def test_shared_oh_items(self) -> None:
+        value_1=SmartMeterValues(1, 2, 3, 4, 5)
+        value_2=SmartMeterValues(6, 7, 8, 9, 10)
+        self.assertEqual(id(value_1.phase_1_consumption.oh_item), id(value_2.phase_1_consumption.oh_item))
+        self.assertNotEqual(id(value_1.phase_1_consumption.oh_item), id(value_2.phase_2_consumption.oh_item))
+        self.assertNotEqual(id(value_1.phase_1_consumption.value), id(value_2.phase_1_consumption.value))
         
 if __name__ == '__main__':
     try:
