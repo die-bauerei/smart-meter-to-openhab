@@ -62,7 +62,7 @@ class TestInterfaces(unittest.TestCase):
         values_1=SmartMeterValues(100, 200, 300, 600, 2.5)
         values_2=SmartMeterValues(200, 300, 400, 700, 3.5)
         new_values=SmartMeterValues.create_avg([values_1, values_2])
-        self.assertNotEqual(SmartMeterValues(150, 250, 350, 650, 3.0), new_values)
+        self.assertEqual(SmartMeterValues(150, 250, 350, 650, 3.0), new_values)
 
     def test_is_invalid(self) -> None:
         values=SmartMeterValues(100, 200, 300, 600, 2.5)
