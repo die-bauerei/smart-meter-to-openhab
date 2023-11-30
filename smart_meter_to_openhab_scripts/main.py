@@ -42,6 +42,7 @@ def main() -> None:
     logger.info(f"Starting smart_meter_to_openhab version {__version__}")
     logger.setLevel(logging.INFO if args.verbose else logging.WARN)
     try:
+        # TODO: ping the specified oh items and restart this code block if last change > 10 min or something
         sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
         from smart_meter_to_openhab.openhab import OpenhabConnection
         from smart_meter_to_openhab.sml_iskra_mt175 import SmlIskraMt175

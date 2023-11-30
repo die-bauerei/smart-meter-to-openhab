@@ -1,8 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Any, Union, Tuple, ClassVar
+from typing import List, Any, Union, Tuple, ClassVar, cast
 from statistics import mean
-from abc import ABC, abstractmethod
+from abc import ABC
 import os
 
 @dataclass(frozen=True, eq=False)
@@ -41,23 +41,44 @@ class OhItemAndValue():
     def oh_item(self) -> OhItem:
         return OhItemAndValue._shared_oh_items[self._oh_item_index]
 
+ContainerValuesType = Union[Tuple[Union[float, None], ...], None]
 class OhItemAndValueContainer(ABC):
-    @abstractmethod
-    def convert_to_item_value_list(self) -> List[OhItemAndValue]:
-        pass
+    def __init__(self, oh_item_names : Tuple[str, ...], values : ContainerValuesType = None) -> None:
+        if values is not None and len(oh_item_names) != len(values):
+            raise ValueError(f"Unable to create OhItemAndValueContainer: Value size mismatch")
+        self._oh_items_and_values=[OhItemAndValue(oh_item_names[i], values[i] if values is not None else None) for i in range(len(oh_item_names))]
+
+    def reset(self) -> None:
+        for oh_item_value in self._oh_items_and_values:
+            oh_item_value.value = None
+
+    def assign_values(self, new_values : List[OhItemAndValue]) -> None:
+        for new_value in new_values:
+            for this_value in self._oh_items_and_values:
+                if this_value.oh_item == new_value.oh_item:
+                    this_value.value = new_value.value
+                    break
+                    
+    def item_value_list(self) -> List[OhItemAndValue]:
+        return self._oh_items_and_values.copy()
 
     def is_invalid(self) -> bool:
-        return any(value is None for value in self.convert_to_value_list())
+        return any(oh_item_value.value is None for oh_item_value in self._oh_items_and_values)
     
-    def convert_to_value_list(self) -> List[Any]:
-        full_list : List[OhItemAndValue]=self.convert_to_item_value_list()
-        return [v.value for v in full_list]
+    def value_list(self) -> List[Any]:
+        return [v.value for v in self._oh_items_and_values]
     
     def __eq__(self, other) -> bool:
         if isinstance(other, OhItemAndValueContainer):
-            return self.convert_to_item_value_list() == other.convert_to_item_value_list()
+            return self._oh_items_and_values == other._oh_items_and_values
         return False
-
+    
+    @staticmethod    
+    def create_container(values : List[OhItemAndValue], oh_item_names : Tuple[str,...]) -> OhItemAndValueContainer:
+        value_container=OhItemAndValueContainer(oh_item_names)
+        value_container.assign_values(values)
+        return value_container
+    
 # NOTE: Use a tuple (immutable type) here to prevent changing the values 
 SmartMeterOhItemNames = Tuple[str, str, str, str, str]
 def _read_smart_meter_env() -> SmartMeterOhItemNames:
@@ -75,22 +96,23 @@ class SmartMeterValues(OhItemAndValueContainer):
                  electricity_meter : Union[float, None] = None, 
                  user_specified_oh_item_names : Union[SmartMeterOhItemNames, None] = None) -> None:
         oh_items = user_specified_oh_item_names if user_specified_oh_item_names is not None else SmartMeterValues._oh_item_names
-        self.phase_1_consumption = OhItemAndValue(oh_items[0], phase_1_consumption)
-        self.phase_2_consumption = OhItemAndValue(oh_items[1], phase_2_consumption)
-        self.phase_3_consumption = OhItemAndValue(oh_items[2], phase_3_consumption)
-        self.overall_consumption = OhItemAndValue(oh_items[3], overall_consumption)
-        self.electricity_meter = OhItemAndValue(oh_items[4], electricity_meter)
+        super().__init__(oh_items, (phase_1_consumption, phase_2_consumption, phase_3_consumption, overall_consumption, electricity_meter))
 
-    def reset(self) -> None:
-        self.phase_1_consumption.value = None
-        self.phase_2_consumption.value = None
-        self.phase_3_consumption.value = None
-        self.overall_consumption.value = None
-        self.electricity_meter.value = None
-
-    def convert_to_item_value_list(self) -> List[OhItemAndValue]:
-        return [self.phase_1_consumption, self.phase_2_consumption, self.phase_3_consumption,
-                self.overall_consumption, self.electricity_meter]
+    @property
+    def phase_1_consumption(self) -> OhItemAndValue:
+        return self._oh_items_and_values[0]
+    @property
+    def phase_2_consumption(self) -> OhItemAndValue:
+        return self._oh_items_and_values[1]
+    @property
+    def phase_3_consumption(self) -> OhItemAndValue:
+        return self._oh_items_and_values[2]
+    @property
+    def overall_consumption(self) -> OhItemAndValue:
+        return self._oh_items_and_values[3]
+    @property
+    def electricity_meter(self) -> OhItemAndValue:
+        return self._oh_items_and_values[4]
     
     def __repr__(self) -> str:
         return f"L1={self.phase_1_consumption.value} L2={self.phase_2_consumption.value} "\
@@ -102,19 +124,8 @@ class SmartMeterValues(OhItemAndValueContainer):
 
     @staticmethod    
     def create(values : List[OhItemAndValue], user_specified_oh_item_names : Union[SmartMeterOhItemNames, None] = None) -> SmartMeterValues:
-        smart_meter_values=SmartMeterValues(None, None, None, None, None, user_specified_oh_item_names)
-        for v in values:
-            if v.oh_item == smart_meter_values.phase_1_consumption.oh_item:
-                smart_meter_values.phase_1_consumption.value = v.value
-            elif v.oh_item == smart_meter_values.phase_2_consumption.oh_item:
-                smart_meter_values.phase_2_consumption.value = v.value
-            elif v.oh_item == smart_meter_values.phase_3_consumption.oh_item:
-                smart_meter_values.phase_3_consumption.value = v.value
-            elif v.oh_item == smart_meter_values.overall_consumption.oh_item:
-                smart_meter_values.overall_consumption.value = v.value
-            elif v.oh_item == smart_meter_values.electricity_meter.oh_item:
-                smart_meter_values.electricity_meter.value = v.value
-        return smart_meter_values
+        oh_items = user_specified_oh_item_names if user_specified_oh_item_names is not None else SmartMeterValues.oh_item_names()
+        return cast(SmartMeterValues, OhItemAndValueContainer.create_container(values, oh_items))
     
     @staticmethod
     def create_avg(values : List[SmartMeterValues], user_specified_oh_item_names : Union[SmartMeterOhItemNames, None] = None) -> SmartMeterValues:
@@ -147,11 +158,12 @@ class ExtendedSmartMeterValues(OhItemAndValueContainer):
     def __init__(self, overall_consumption_wh : Union[float, None] = None,
                  user_specified_oh_item_name : Union[ExtendedSmartMeterOhItemNames, None] = None) -> None:
         oh_items = user_specified_oh_item_name if user_specified_oh_item_name is not None else ExtendedSmartMeterValues._oh_item_names
-        self.overall_consumption_wh = OhItemAndValue(oh_items[0], overall_consumption_wh)
+        super().__init__(oh_items, (overall_consumption_wh,))
 
-    def convert_to_item_value_list(self) -> List[OhItemAndValue]:
-        return [self.overall_consumption_wh]
-    
+    @property
+    def overall_consumption_wh(self) -> OhItemAndValue:
+        return self._oh_items_and_values[0]
+
     def __repr__(self) -> str:
         return f"Overall(Wh)={self.overall_consumption_wh.value}"
 
@@ -160,9 +172,6 @@ class ExtendedSmartMeterValues(OhItemAndValueContainer):
         return ExtendedSmartMeterValues._oh_item_names
 
     @staticmethod    
-    def create(values : List[OhItemAndValue], user_specified_oh_item_name : Union[ExtendedSmartMeterOhItemNames, None] = None) -> ExtendedSmartMeterValues:
-        extended_values=ExtendedSmartMeterValues(None, user_specified_oh_item_name)
-        for v in values:
-            if v.oh_item == extended_values.overall_consumption_wh.oh_item:
-                extended_values.overall_consumption_wh.value = v.value
-        return extended_values
+    def create(values : List[OhItemAndValue], user_specified_oh_item_names : Union[ExtendedSmartMeterOhItemNames, None] = None) -> ExtendedSmartMeterValues:
+        oh_items = user_specified_oh_item_names if user_specified_oh_item_names is not None else ExtendedSmartMeterValues.oh_item_names()
+        return cast(ExtendedSmartMeterValues, OhItemAndValueContainer.create_container(values, oh_items))

@@ -37,20 +37,20 @@ class SmlReader():
         SmartMeterValues
             Contains the data read from the smart meter
         """
-        ref_value_list=ref_values.convert_to_value_list()
+        ref_value_list=ref_values.value_list()
         values=SmartMeterValues()
         for i in range(max_read_count):
             values=read_func()
             if values.is_invalid():
                 self._logger.info(f"Detected invalid values during SML read. Trying again")
                 continue
-            value_list=values.convert_to_value_list()
+            value_list=values.value_list()
             if _has_outlier(value_list, ref_value_list):
                 self._logger.info(f"Detected unrealistic values during SML read. Trying again")
                 continue
             break
 
-        value_list=values.convert_to_value_list()
+        value_list=values.value_list()
         if values.is_invalid() or _has_outlier(value_list, ref_value_list):
             self._logger.warning(f"Unable to read and validate SML data. Ignoring following values: {values}")
             values.reset()

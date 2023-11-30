@@ -34,17 +34,24 @@ class TestInterfaces(unittest.TestCase):
         self.assertEqual(values.overall_consumption.oh_item, 'unit_tests_smart_meter_overall_consumption')
         self.assertEqual(extended_values.overall_consumption_wh.oh_item, 'unit_tests_smart_meter_overall_consumption_wh')
         self.assertEqual(values.electricity_meter.oh_item, 'unit_tests_smart_meter_electricity_meter')
-        self.assertTrue(all(value is None for value in values.convert_to_value_list()))
-        self.assertTrue(all(value is None for value in extended_values.convert_to_value_list()))
-        self.assertEqual(len(values.convert_to_value_list()), 5)
-        self.assertEqual(len(extended_values.convert_to_value_list()), 1)
+        self.assertTrue(all(value is None for value in values.value_list()))
+        self.assertTrue(all(value is None for value in extended_values.value_list()))
+        self.assertEqual(len(values.value_list()), 5)
+        self.assertEqual(len(extended_values.value_list()), 1)
+
+    def test_reset(self) -> None:
+        values=SmartMeterValues(100, 200, 300, 600, 2.5)
+        none_values=SmartMeterValues()
+        self.assertNotEqual(values, none_values)
+        values.reset()
+        self.assertEqual(values, none_values)
 
     def test_creation(self) -> None:
         values=SmartMeterValues(100, 200, 300, 600, 2.5)
-        new_values=SmartMeterValues.create(values.convert_to_item_value_list())
+        new_values=SmartMeterValues.create(values.item_value_list())
         self.assertEqual(values, new_values)
         values.phase_1_consumption.value=None
-        new_values=SmartMeterValues.create(values.convert_to_item_value_list())
+        new_values=SmartMeterValues.create(values.item_value_list())
         self.assertEqual(values, new_values)
 
     def test_creation_not_all_items(self) -> None:
@@ -55,7 +62,7 @@ class TestInterfaces(unittest.TestCase):
         values=SmartMeterValues(None, None, None, None, None, oh_item_names)
         values.phase_2_consumption.value=200
         values.phase_3_consumption.value=300
-        new_values=SmartMeterValues.create(values.convert_to_item_value_list(), oh_item_names)
+        new_values=SmartMeterValues.create(values.item_value_list(), oh_item_names)
         self.assertEqual(values, new_values)
 
     def test_creation_average(self) -> None:

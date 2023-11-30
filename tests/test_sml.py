@@ -32,7 +32,7 @@ class TestSml(unittest.TestCase):
         TestSml._function_call_count=0
         TestSml._test_values[0].phase_1_consumption.value=None
         read_values=reader.read_from_sml(read_func=TestSml._return_test_values, max_read_count=1)
-        self.assertTrue(all(value is None for value in read_values.convert_to_value_list()))
+        self.assertTrue(all(value is None for value in read_values.value_list()))
 
     def test_read_with_ref_values(self) -> None:
         TestSml._function_call_count=0
@@ -45,7 +45,7 @@ class TestSml(unittest.TestCase):
         TestSml._function_call_count=0
         TestSml._test_values[0].phase_1_consumption.value=1000000
         read_values=reader.read_from_sml(read_func=TestSml._return_test_values, max_read_count=1, ref_values=ref_values)
-        self.assertTrue(all(value is None for value in read_values.convert_to_value_list()))
+        self.assertTrue(all(value is None for value in read_values.value_list()))
 
     def test_read_avg(self) -> None:
         TestSml._function_call_count=0

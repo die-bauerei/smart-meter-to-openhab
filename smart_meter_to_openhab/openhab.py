@@ -22,7 +22,7 @@ class OpenhabConnection():
         self._logger=logger
 
     def post_to_items(self, value_container : OhItemAndValueContainer) -> None:
-        for v in value_container.convert_to_item_value_list():
+        for v in value_container.item_value_list():
             if v.value is not None and v.oh_item:
                 try:
                     with self._session.post(url=f"{self._oh_host}/rest/items/{v.oh_item}", data=str(v.value)) as response:
