@@ -1,12 +1,12 @@
 import serial
-from time import sleep
 from datetime import timedelta, datetime
 from logging import Logger
 from .interfaces import SmartMeterValues
 
 class SmlIskraMt175():
     def __init__(self, serial_port : str, logger : Logger) -> None:
-        self._port=serial.Serial(port=serial_port, baudrate=9600, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
+        self._port=serial.Serial(baudrate=9600, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
+        self._serial_port=serial_port
         self._logger=logger
 
     def read(self, time_out : timedelta = timedelta(seconds=5)) -> SmartMeterValues:
@@ -25,8 +25,12 @@ class SmlIskraMt175():
         """
         data = ''
         smart_meter_values=SmartMeterValues()
-        time_start=datetime.now()
         try:
+            if not self._port.is_open:
+                self._port.port=self._serial_port
+                self._port.open()
+                
+            time_start=datetime.now()
             while (datetime.now() - time_start) <= time_out:
                 input : bytes = self._port.read()
                 data += input.hex()          # Convert Bytes to Hex String to use find function for easy parsing
@@ -57,15 +61,13 @@ class SmlIskraMt175():
                     smart_meter_values.phase_3_consumption.value = int(data[pos+28:pos+36], 16) if pos != -1 else None
 
                     break
+            
+            if (datetime.now() - time_start) > time_out:
+                self._logger.warning(f"Exceeded time out of {time_out} while reading from smart meter.")
         except serial.SerialException as e:
             self._logger.warning("Caught Exception: " + str(e))
             self._logger.warning("Returning None values.")
             self._port.close()
-            sleep(5)
-            self._port.open()
             smart_meter_values.reset()
-        
-        if (datetime.now() - time_start) > time_out:
-            self._logger.warning(f"Exceeded time out of {time_out} while reading from smart meter.")
         
         return smart_meter_values

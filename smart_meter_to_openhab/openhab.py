@@ -52,10 +52,11 @@ class OpenhabConnection():
     def get_extended_values_from_items(self, oh_item_names : ExtendedSmartMeterOhItemNames) -> ExtendedSmartMeterValues:
         return ExtendedSmartMeterValues.create(self.get_item_value_list_from_items(oh_item_names))
 
-    def check_if_updated(self, oh_item_names : Tuple[str, ...], timedelta : datetime.timedelta) -> bool:
+    PersistenceValuesType = List[List[float]]
+    def _get_persistence_values(self, oh_item_names : Tuple[str, ...], timedelta : datetime.timedelta) -> PersistenceValuesType:
+        pers_values = []
         end_time=datetime.datetime.now()
         start_time=end_time-timedelta
-        data_count=None
         for item in oh_item_names:
             if item:
                 try:
@@ -65,33 +66,27 @@ class OpenhabConnection():
                         if response.status_code != http.HTTPStatus.OK:
                             self._logger.warning(f"Failed to get persistence values from openhab item {item}. Return code: {response.status_code}. text: {response.text})")
                         else:
-                            data_count = int(response.json()['datapoints'])
+                            pers_values.append([float(data['state']) for data in response.json()['data']])
                 except requests.exceptions.RequestException as e:
                     self._logger.warning("Caught Exception while getting persistence data from openHAB: " + str(e))
-            
-            if data_count is not None and data_count == 0:
-                break
-        return data_count is None or data_count > 0
+                    pers_values.append([])
+        return pers_values
 
+    def check_if_updated(self, oh_item_names : Tuple[str, ...], timedelta : datetime.timedelta) -> bool:
+        pers_values=self._get_persistence_values(oh_item_names, timedelta)
+        for values in pers_values:
+            if all(i == values[0] for i in values):
+                return False
+        return True
 
     def get_median_from_items(self, oh_item_names : SmartMeterOhItemNames, timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:
         smart_meter_values : List[OhItemAndValue] = []
-        end_time=datetime.datetime.now()
-        start_time=end_time-timedelta
+        pers_values=self._get_persistence_values(oh_item_names, timedelta)
+        value_index=0
         for item in oh_item_names:
             if item:
-                try:   
-                    with self._session.get(
-                        url=f"{self._oh_host}/rest/persistence/items/{item}", 
-                        params={'starttime': start_time.isoformat(), 'endtime': end_time.isoformat()}) as response:
-                        if response.status_code != http.HTTPStatus.OK:
-                            self._logger.warning(f"Failed to get average value from openhab item {item}. Return code: {response.status_code}. text: {response.text})")
-                        else:
-                            item_values = [float(data['state']) for data in response.json()['data']]
-                            avg_value = median(item_values) if len(item_values) > 10 else None
-                            smart_meter_values.append(OhItemAndValue(item, avg_value))
-                except requests.exceptions.RequestException as e:
-                    self._logger.warning("Caught Exception while getting persistence data from openHAB: " + str(e))
-                    smart_meter_values.append(OhItemAndValue(item))
+                avg_value = median(pers_values[value_index]) if len(pers_values[value_index]) > 10 else None
+                smart_meter_values.append(OhItemAndValue(item, avg_value))
+                value_index+=1
         return SmartMeterValues.create(smart_meter_values)
 
