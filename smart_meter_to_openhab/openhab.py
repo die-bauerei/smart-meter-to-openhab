@@ -59,6 +59,7 @@ class OpenhabConnection():
         start_time=end_time-timedelta
         for item in oh_item_names:
             if item:
+                values=[]
                 try:
                     with self._session.get(
                         url=f"{self._oh_host}/rest/persistence/items/{item}", 
@@ -66,10 +67,10 @@ class OpenhabConnection():
                         if response.status_code != http.HTTPStatus.OK:
                             self._logger.warning(f"Failed to get persistence values from openhab item {item}. Return code: {response.status_code}. text: {response.text})")
                         else:
-                            pers_values.append([float(data['state']) for data in response.json()['data']])
+                            values=[float(data['state']) for data in response.json()['data']]
                 except requests.exceptions.RequestException as e:
                     self._logger.warning("Caught Exception while getting persistence data from openHAB: " + str(e))
-                    pers_values.append([])
+                pers_values.append(values)
         return pers_values
 
     def check_if_updated(self, oh_item_names : Tuple[str, ...], timedelta : datetime.timedelta) -> bool:
