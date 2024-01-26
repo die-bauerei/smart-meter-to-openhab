@@ -65,7 +65,7 @@ def _run(process_start_time : datetime, logger : logging.Logger, read_count : in
                 ExtendedSmartMeterValues.oh_item_names(), ping_timedelta)
         sleep(interval_in_sec)
     
-    logger.warning("openHAB items seem to have not been updated - reinit process")
+    logger.error("openHAB items seem to have not been updated")
 
 def main() -> None:
     parser=create_args_parser()
@@ -77,12 +77,16 @@ def main() -> None:
     logger.info(f"Starting smart_meter_to_openhab version {__version__}")
     logger.setLevel(logging.INFO if args.verbose else logging.WARN)
     try:
-        while True:
-            _run(datetime.now(), logger, args.smart_meter_read_count, args.interval_in_sec, args.ping_in_min)
+        # it is expected that the process runs forever as long as it works properly.
+        _run(datetime.now(), logger, args.smart_meter_read_count, args.interval_in_sec, args.ping_in_min)
     except Exception as e:
         logger.exception("Caught Exception: " + str(e))
     except:
         logger.exception("Caught unknow exception")
+    
+    # if the process ends, something went wrong. Indicate this by exit code 1
+    # TODO: check if "stty -F /dev/ttyS0 sane" is needed to reset the serial port
+    sys.exit(1)
 
 if __name__ == '__main__':
     main()

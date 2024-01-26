@@ -49,7 +49,7 @@ ELECTRICITY_METER_KWH_OH_ITEM='smart_meter_electricity_meter'
 nohup smart_meter_to_openhab --logfile ~/smart_meter.log --verbose &
 ```
 
-## Autostart after reboot ##
+## Autostart after reboot and on failure##
 Create a systemd service by opening the file */etc/systemd/system/smart_meter_to_openhab.service* and copy paste the following contents. Replace User/Group/ExecStart accordingly. 
 ```bash
 [Unit]
@@ -62,6 +62,8 @@ Type=simple
 User=openhab
 Group=openhab
 UMask=002
+Restart=on-failure
+RestartSec=5s
 ExecStart=/usr/bin/bash -lc "/home/openhab/smart_meter_py_env/bin/smart_meter_to_openhab --logfile /home/openhab/smart_meter.log --verbose"
 
 [Install]
