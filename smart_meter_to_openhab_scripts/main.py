@@ -2,11 +2,12 @@ import argparse
 import logging
 import sys
 import os
+import subprocess
 from datetime import timedelta, datetime
 from pathlib import Path
 from time import sleep
 from dotenv import load_dotenv
-from typing import Union
+from typing import Union, List
 sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
 
 try:
@@ -32,10 +33,17 @@ def create_args_parser() -> argparse.ArgumentParser:
     parser.add_argument("--interval_in_sec", type=int, required=False, default=10, help="Interval in which the data will be read and pushed")
     parser.add_argument("--ping_in_min", type=int, required=False, default=10, help="Reinit if no data can be found in the openHAB DB in the given timeframe")
     parser.add_argument("--logfile", type=Path, required=False, help="Write logging to this file instead of to stdout")
+    parser.add_argument('--uhubctl', action='store_true', help="Use uhubctl to power off and on the usb port on reinit")
     parser.add_argument('-v', '--verbose', action='store_true')
     return parser
 
-def _run(process_start_time : datetime, logger : logging.Logger, read_count : int, interval_in_sec : int, ping_in_min : int) -> None:
+def _exec_process(params : List[str]) -> None:
+    result = subprocess.run(params, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    rc=result.returncode
+    if rc != 0:
+        raise Exception("Failed to execute command "+ ' '.join(params)+". Return code was: "+str(result.returncode))
+
+def _run(process_start_time : datetime, logger : logging.Logger, read_count : int, interval_in_sec : int, ping_in_min : int, use_uhubctl : bool) -> None:
     from smart_meter_to_openhab.openhab import OpenhabConnection
     from smart_meter_to_openhab.sml_iskra_mt175 import SmlIskraMt175
     from smart_meter_to_openhab.sml_reader import SmlReader
@@ -65,7 +73,12 @@ def _run(process_start_time : datetime, logger : logging.Logger, read_count : in
                 ExtendedSmartMeterValues.oh_item_names(), ping_timedelta)
         sleep(interval_in_sec)
     
-    logger.error("openHAB items seem to have not been updated")
+    if use_uhubctl:
+        logger.warning("openHAB items seem to have not been updated - Power off and on usb ports and reinit process")
+        _exec_process(["sudo", "uhubctl", "-a", "cycle", "-d", "10", "-p", "1-5"])
+        sleep(1)
+    else:
+        logger.warning("openHAB items seem to have not been updated - reinit process")
 
 def main() -> None:
     parser=create_args_parser()
@@ -77,16 +90,12 @@ def main() -> None:
     logger.info(f"Starting smart_meter_to_openhab version {__version__}")
     logger.setLevel(logging.INFO if args.verbose else logging.WARN)
     try:
-        # it is expected that the process runs forever as long as it works properly.
-        _run(datetime.now(), logger, args.smart_meter_read_count, args.interval_in_sec, args.ping_in_min)
+        while True:
+            _run(datetime.now(), logger, args.smart_meter_read_count, args.interval_in_sec, args.ping_in_min, args.uhubctl)
     except Exception as e:
         logger.exception("Caught Exception: " + str(e))
     except:
         logger.exception("Caught unknow exception")
-    
-    # if the process ends, something went wrong. Indicate this by exit code 1
-    # TODO: check if "stty -F /dev/ttyS0 sane" is needed to reset the serial port
-    sys.exit(1)
 
 if __name__ == '__main__':
     main()

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "smart_meter_to_openhab"
-version = "0.2.5"
+version = "0.2.6"
 description = "Pushing data of ISKRA MT175 smart meter to openhab"
 authors = ["Heiko Bauer <heiko_bauer@icloud.com>"]
 repository = "https://github.com/die-bauerei/smart-meter-to-openhab"
