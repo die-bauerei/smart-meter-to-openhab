@@ -18,6 +18,7 @@ class OpenhabConnection():
                 backoff_factor=0.1,
                 status_forcelist=[ 500, 502, 503, 504 ])
         self._session.mount('http://', HTTPAdapter(max_retries=retries))
+        self._session.mount('https://', HTTPAdapter(max_retries=retries))
         self._session.headers={'Content-Type': 'text/plain'}
         self._logger=logger
 
@@ -25,7 +26,7 @@ class OpenhabConnection():
         for v in value_container.item_value_list():
             if v.value is not None and v.oh_item:
                 try:
-                    with self._session.post(url=f"{self._oh_host}/rest/items/{v.oh_item}", data=str(v.value)) as response:
+                    with self._session.post(url=f"{self._oh_host}/rest/items/{v.oh_item}", data=str(v.value), verify=False) as response:
                         if response.status_code != http.HTTPStatus.OK:
                             self._logger.warning(f"Failed to post value to openhab item {v.oh_item}. Return code: {response.status_code}. text: {response.text})")
                 except requests.exceptions.RequestException as e:
@@ -36,7 +37,7 @@ class OpenhabConnection():
         for item in oh_item_names:
             if item:
                 try:
-                    with self._session.get(url=f"{self._oh_host}/rest/items/{item}/state") as response:
+                    with self._session.get(url=f"{self._oh_host}/rest/items/{item}/state", verify=False) as response:
                         if response.status_code != http.HTTPStatus.OK:
                             self._logger.warning(f"Failed to get value from openhab item {item}. Return code: {response.status_code}. text: {response.text})")
                         else:
@@ -63,7 +64,8 @@ class OpenhabConnection():
                 try:
                     with self._session.get(
                         url=f"{self._oh_host}/rest/persistence/items/{item}", 
-                        params={'starttime': start_time.isoformat(), 'endtime': end_time.isoformat()}) as response:
+                        params={'starttime': start_time.isoformat(), 'endtime': end_time.isoformat()},
+                        verify=False) as response:
                         if response.status_code != http.HTTPStatus.OK:
                             self._logger.warning(f"Failed to get persistence values from openhab item {item}. Return code: {response.status_code}. text: {response.text})")
                         else:

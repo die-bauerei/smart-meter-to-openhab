@@ -75,6 +75,7 @@ def _run(process_start_time : datetime, logger : logging.Logger, read_count : in
     
     if use_uhubctl:
         logger.warning("openHAB items seem to have not been updated - Power off and on usb ports and reinit process")
+        # TODO: sudo reboot seems to help a lot more. But lets try this first
         _exec_process(["sudo", "uhubctl", "-a", "cycle", "-d", "10", "-p", "1-5"])
         sleep(1)
     else:
