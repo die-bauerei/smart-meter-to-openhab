@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Any, Union, Tuple, ClassVar, cast
+from typing import List, Any, Union, Tuple, ClassVar, cast, Iterator
 from statistics import mean
 from abc import ABC
 import os
@@ -45,6 +45,7 @@ ContainerValuesType = Union[Tuple[Union[float, None], ...], None]
 class OhItemAndValueContainer(ABC):
     def __init__(self, oh_item_names : Tuple[str, ...], values : ContainerValuesType = None) -> None:
         if values is not None and len(oh_item_names) != len(values):
+            # TODO: move this to __post_init__ and raise an exception there
             raise ValueError(f"Unable to create OhItemAndValueContainer: Value size mismatch")
         self._oh_items_and_values=[OhItemAndValue(oh_item_names[i], values[i] if values is not None else None) for i in range(len(oh_item_names))]
 
@@ -58,15 +59,17 @@ class OhItemAndValueContainer(ABC):
                 if this_value.oh_item == new_value.oh_item:
                     this_value.value = new_value.value
                     break
-                    
-    def item_value_list(self) -> List[OhItemAndValue]:
-        return self._oh_items_and_values.copy()
 
+    def __iter__(self) -> Iterator[OhItemAndValue]:
+        return iter(self._oh_items_and_values)                
+    
     def is_invalid(self) -> bool:
-        return any(oh_item_value.value is None for oh_item_value in self._oh_items_and_values)
+        # consider only the values that really will be used (oh_item name not empty)
+        return any(oh_item_value.value is None for oh_item_value in self._oh_items_and_values if oh_item_value.oh_item)
     
     def value_list(self) -> List[Any]:
-        return [v.value for v in self._oh_items_and_values]
+        # consider only the values that really will be used (oh_item name not empty)
+        return [oh_item_value.value for oh_item_value in self._oh_items_and_values  if oh_item_value.oh_item]
     
     def __eq__(self, other) -> bool:
         if isinstance(other, OhItemAndValueContainer):

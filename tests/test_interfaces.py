@@ -39,6 +39,12 @@ class TestInterfaces(unittest.TestCase):
         self.assertEqual(len(values.value_list()), 5)
         self.assertEqual(len(extended_values.value_list()), 1)
 
+        # Unspecified oh items (empty env variable) should NOT be in the value list
+        oh_item_names : SmartMeterOhItemNames = ('', '', '', SmartMeterValues.oh_item_names()[3], SmartMeterValues.oh_item_names()[4])
+        partial_values=SmartMeterValues(None, None, None, None, None, oh_item_names)
+        self.assertTrue(all(partial_value is None for partial_value in partial_values.value_list()))
+        self.assertEqual(len(partial_values.value_list()), 2)
+
     def test_reset(self) -> None:
         values=SmartMeterValues(100, 200, 300, 600, 2.5)
         none_values=SmartMeterValues()
@@ -48,10 +54,10 @@ class TestInterfaces(unittest.TestCase):
 
     def test_creation(self) -> None:
         values=SmartMeterValues(100, 200, 300, 600, 2.5)
-        new_values=SmartMeterValues.create(values.item_value_list())
+        new_values=SmartMeterValues.create(values._oh_items_and_values)
         self.assertEqual(values, new_values)
         values.phase_1_consumption.value=None
-        new_values=SmartMeterValues.create(values.item_value_list())
+        new_values=SmartMeterValues.create(values._oh_items_and_values)
         self.assertEqual(values, new_values)
 
     def test_creation_not_all_items(self) -> None:
@@ -62,7 +68,7 @@ class TestInterfaces(unittest.TestCase):
         values=SmartMeterValues(None, None, None, None, None, oh_item_names)
         values.phase_2_consumption.value=200
         values.phase_3_consumption.value=300
-        new_values=SmartMeterValues.create(values.item_value_list(), oh_item_names)
+        new_values=SmartMeterValues.create(values._oh_items_and_values, oh_item_names)
         self.assertEqual(values, new_values)
 
     def test_creation_average(self) -> None:
@@ -77,8 +83,7 @@ class TestInterfaces(unittest.TestCase):
         values.phase_1_consumption.value=None
         self.assertTrue(values.is_invalid())
 
-        # NOTE: Even unspecified values should be tested against None. Since we read all values from the smart meter, 
-        #   no matter what will be actually posted to openHAB later on.
+        # NOTE: Unspecified values should NOT be tested against None.
         oh_item_names : SmartMeterOhItemNames = ('', SmartMeterValues.oh_item_names()[1], 
                                                 SmartMeterValues.oh_item_names()[2],
                                                 SmartMeterValues.oh_item_names()[3],
@@ -86,7 +91,7 @@ class TestInterfaces(unittest.TestCase):
         values=SmartMeterValues(100, 200, 300, 600, 2.5, oh_item_names)
         self.assertFalse(values.is_invalid())
         values.phase_1_consumption.value=None
-        self.assertTrue(values.is_invalid())
+        self.assertFalse(values.is_invalid())
 
         # NOTE: The value for watt/h is considered in the extended values
         extended_values=ExtendedSmartMeterValues(0.5)

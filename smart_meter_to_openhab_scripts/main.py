@@ -24,6 +24,15 @@ def create_logger(file : Union[str, None]) -> logging.Logger:
     logger.addHandler(log_handler)
     return logger
 
+def log_level_from_arg(verbosity_count : int) -> int:
+    if verbosity_count == 0:
+        return logging.ERROR
+    if verbosity_count == 1:
+        return logging.WARN
+    if verbosity_count == 2:
+        return logging.INFO
+    return logging.DEBUG
+    
 def create_args_parser() -> argparse.ArgumentParser:
     parser=argparse.ArgumentParser(description=f"A tool to push data of ISKRA MT175 smart meter to openHAB. Version {__version__}")
     parser.add_argument("--dotenv_path", type=Path, required=False, help=f"Provide the required environment variables in this .env file \
@@ -34,7 +43,7 @@ def create_args_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ping_in_min", type=int, required=False, default=10, help="Reinit if no data can be found in the openHAB DB in the given timeframe")
     parser.add_argument("--logfile", type=Path, required=False, help="Write logging to this file instead of to stdout")
     parser.add_argument('--uhubctl', action='store_true', help="Use uhubctl to power off and on the usb port on reinit")
-    parser.add_argument('-v', '--verbose', action='store_true')
+    parser.add_argument('-v', '--verbose', action='count', default=0)
     return parser
 
 def _exec_process(params : List[str]) -> None:
@@ -89,7 +98,7 @@ def main() -> None:
     logger=create_logger(args.logfile)
     logger.setLevel(logging.INFO)
     logger.info(f"Starting smart_meter_to_openhab version {__version__}")
-    logger.setLevel(logging.INFO if args.verbose else logging.WARN)
+    logger.setLevel(log_level_from_arg(args.verbose))
     try:
         while True:
             _run(datetime.now(), logger, args.smart_meter_read_count, args.interval_in_sec, args.ping_in_min, args.uhubctl)
