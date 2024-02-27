@@ -52,7 +52,7 @@ class SmlReader():
 
         value_list=values.value_list()
         if values.is_invalid() or _has_outlier(value_list, ref_value_list):
-            self._logger.warning(f"Unable to read and validate SML data. Ignoring following values: {values}")
+            self._logger.info(f"Unable to read and validate SML data. Ignoring following values: {values}")
             values.reset()
 
         return values
