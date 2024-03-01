@@ -8,6 +8,10 @@ from typing import List, Tuple
 from statistics import median
 from .interfaces import *
 
+# disable warnings about insecure requests because ssl verification is disabled
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 class OpenhabConnection():
     def __init__(self, oh_host : str, oh_user : str, oh_passwd : str, logger : Logger) -> None:
         self._oh_host=oh_host
