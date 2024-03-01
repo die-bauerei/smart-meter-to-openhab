@@ -1,6 +1,5 @@
 import argparse
 import logging
-import sys
 import os
 import subprocess
 from datetime import timedelta, datetime
@@ -8,7 +7,6 @@ from pathlib import Path
 from time import sleep
 from dotenv import load_dotenv
 from typing import Union, List
-sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
 
 try:
     import importlib.metadata

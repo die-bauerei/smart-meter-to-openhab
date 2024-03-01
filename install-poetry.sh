@@ -31,7 +31,7 @@ if ! command -v poetry &> /dev/null; then
 ~/.local/bin/poetry self update
 ~/.local/bin/poetry env use /usr/bin/python$PY_VERSION
 ~/.local/bin/poetry config virtualenvs.in-project true
-~/.local/bin/poetry install --no-root
+~/.local/bin/poetry install
 # if install fails, check https://github.com/MISP/PyMISP/issues/669
 # to uninstall call: python3 install-poetry.py --uninstall
 
