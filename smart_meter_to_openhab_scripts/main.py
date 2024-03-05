@@ -98,8 +98,9 @@ def main() -> None:
     logger.info(f"Starting smart_meter_to_openhab version {__version__}")
     logger.setLevel(log_level_from_arg(args.verbose))
     try:
+        process_start_time=datetime.now()
         while True:
-            _run(datetime.now(), logger, args.smart_meter_read_count, args.interval_in_sec, args.ping_in_min, args.uhubctl)
+            _run(process_start_time, logger, args.smart_meter_read_count, args.interval_in_sec, args.ping_in_min, args.uhubctl)
     except Exception as e:
         logger.exception("Caught Exception: " + str(e))
     except:
