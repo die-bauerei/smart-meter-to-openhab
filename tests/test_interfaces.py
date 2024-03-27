@@ -77,10 +77,20 @@ class TestInterfaces(unittest.TestCase):
         new_values=SmartMeterValues.create_avg([values_1, values_2])
         self.assertEqual(SmartMeterValues(150, 250, 350, 650, 3.0), new_values)
 
+        values_incl_none_1=SmartMeterValues(200, 300, None, 300, None)
+        new_values=SmartMeterValues.create_avg([values_1, values_incl_none_1])
+        self.assertEqual(SmartMeterValues(150, 250, 300, 450, 2.5), new_values)
+        
+        values_incl_none_2=SmartMeterValues(100, None, 100, 100, None)
+        new_values=SmartMeterValues.create_avg([values_incl_none_1, values_incl_none_2])
+        self.assertEqual(SmartMeterValues(150, 300, 100, 200, None), new_values)
+
     def test_is_invalid(self) -> None:
         values=SmartMeterValues(100, 200, 300, 600, 2.5)
         self.assertFalse(values.is_invalid())
         values.phase_1_consumption.value=None
+        self.assertFalse(values.is_invalid())
+        values.reset()
         self.assertTrue(values.is_invalid())
 
         # NOTE: Unspecified values should NOT be tested against None.

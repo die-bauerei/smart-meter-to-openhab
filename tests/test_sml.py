@@ -28,11 +28,13 @@ class TestSml(unittest.TestCase):
         reader=SmlReader(logger)
         read_values=reader.read_from_sml(read_func=TestSml._return_test_values, max_read_count=1)
         self.assertEqual(TestSml._test_values[0], read_values)
-        # If there is at least one invalid (None) value, all returned values should be None
+
+        # check for single invalid (None) value. The other values should stay valid
         TestSml._function_call_count=0
         TestSml._test_values[0].phase_1_consumption.value=None
         read_values=reader.read_from_sml(read_func=TestSml._return_test_values, max_read_count=1)
-        self.assertTrue(all(value is None for value in read_values.value_list()))
+        self.assertIsNone(read_values.phase_1_consumption.value)
+        self.assertEqual(TestSml._test_values[0], read_values)
 
     def test_read_with_ref_values(self) -> None:
         TestSml._function_call_count=0

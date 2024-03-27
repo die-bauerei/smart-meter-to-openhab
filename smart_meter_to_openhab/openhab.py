@@ -82,11 +82,9 @@ class OpenhabConnection():
     def check_if_updated(self, oh_item_names : Tuple[str, ...], timedelta : datetime.timedelta) -> bool:
         pers_values=self._get_persistence_values(oh_item_names, timedelta)
         for values in pers_values:
-            if not values:
-                return False
-            elif values[0] > 5.0 and all(i == values[0] for i in values):
-                return False
-        return True
+            if any(i != values[0] for i in values):
+                return True
+        return False
 
     def get_median_from_items(self, oh_item_names : SmartMeterOhItemNames, timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:
         smart_meter_values : List[OhItemAndValue] = []

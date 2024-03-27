@@ -8,7 +8,7 @@ from .utils import compute_watt_h
 MIN_REF_VALUE_IN_WATT=50
 def _has_outlier(value_list : List[Any], ref_value_list : List[Any]) -> bool:
     for i in range(len(value_list)):
-        if ref_value_list[i] is not None and value_list[i]*0.001 > max(ref_value_list[i], MIN_REF_VALUE_IN_WATT):
+        if value_list[i] is not None and ref_value_list[i] is not None and value_list[i]*0.001 > max(ref_value_list[i], MIN_REF_VALUE_IN_WATT):
             return True
     return False
 
@@ -110,5 +110,8 @@ class SmlReader():
         avg_values=self.read_avg_from_sml(read_func, read_count, ref_values)
         extended_values=ExtendedSmartMeterValues()
         if avg_values.overall_consumption.value is not None:
+            # TODO: in case of an error (service restart, ...) the computed time delta would not be realistic. 
+            # A possibility would be to take the timestamp of the last value from openHAB.
+            # Even better would be to resolve errors (checkout libsml)
             extended_values.overall_consumption_wh.value=compute_watt_h(avg_values.overall_consumption.value, datetime.now() - time_start)
         return (avg_values, extended_values)
