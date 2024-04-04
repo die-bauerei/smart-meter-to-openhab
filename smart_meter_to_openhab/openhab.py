@@ -4,7 +4,7 @@ import datetime
 from logging import Logger
 from requests.auth import HTTPBasicAuth
 from requests.adapters import HTTPAdapter, Retry
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from statistics import median
 from .interfaces import *
 
@@ -79,10 +79,13 @@ class OpenhabConnection():
                 pers_values.append(values)
         return pers_values
 
-    def check_if_updated(self, oh_item_names : Tuple[str, ...], timedelta : datetime.timedelta) -> bool:
+    def check_if_updated(self, oh_item_names : Tuple[str, ...], timedelta : datetime.timedelta, 
+                         default : Union[SmartMeterValues, ExtendedSmartMeterValues, None] = None) -> bool:
         pers_values=self._get_persistence_values(oh_item_names, timedelta)
         for values in pers_values:
-            if any(i != values[0] for i in values):
+            if default is not None and default.is_valid() and any(i == default for i in values): # consider a valid default value as updated
+                return True
+            elif any(i != values[0] for i in values):
                 return True
         return False
 

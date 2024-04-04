@@ -54,14 +54,14 @@ def _exec_process(params : List[str]) -> None:
 
 def _run(process_start_time : datetime, logger : logging.Logger, read_count : int, interval_in_sec : int, ping_in_min : int, use_uhubctl : bool) -> bool:
     from smart_meter_to_openhab.openhab import OpenhabConnection
-    from smart_meter_to_openhab.sml_iskra_mt175 import SmlIskraMt175
+    from smart_meter_to_openhab.sml_iskra_mt175 import SmlIskraMt175OneWay
     from smart_meter_to_openhab.sml_reader import SmlReader
     from smart_meter_to_openhab.interfaces import SmartMeterValues, ExtendedSmartMeterValues
 
     oh_user=os.getenv('OH_USER') if 'OH_USER' in os.environ else ''
     oh_passwd=os.getenv('OH_PASSWD') if 'OH_PASSWD' in os.environ else ''
     oh_connection = OpenhabConnection(os.getenv('OH_HOST'), oh_user, oh_passwd, logger) # type: ignore
-    sml_iskra = SmlIskraMt175('/dev/ttyUSB0', logger)
+    sml_iskra = SmlIskraMt175OneWay('/dev/ttyUSB0', logger)
     sml_reader = SmlReader(logger)
     logger.info("Connections established. Starting to transfer smart meter values to openhab.")
     ping_timedelta = timedelta(minutes=ping_in_min)
@@ -69,16 +69,17 @@ def _run(process_start_time : datetime, logger : logging.Logger, read_count : in
     while True:
         logger.info("Reading SML data")
         ref_smart_meter_value=oh_connection.get_median_from_items(SmartMeterValues.oh_item_names())
-        values, extended_values=sml_reader.read_avg_from_sml_and_compute_extended_values(sml_iskra.read, read_count, ref_smart_meter_value)
+        values, extended_values=sml_reader.read_avg_from_sml_and_compute_extended_values(sml_iskra, read_count, 
+                                                                                         ref_values=ref_smart_meter_value)
         logger.info(f"current values: {values}")
         logger.info(f"current extended values: {extended_values}")
         oh_connection.post_to_items(values)
         oh_connection.post_to_items(extended_values)
         logger.info("Values posted to openHAB")
-        sleep(interval_in_sec)
+        sleep(interval_in_sec) # TODO: rm this variable?
         # start pinging after process is running for the specified time
         if (datetime.now() - process_start_time) > ping_timedelta:
-            if not (oh_connection.check_if_updated(SmartMeterValues.oh_item_names(), ping_timedelta) 
+            if not (oh_connection.check_if_updated(SmartMeterValues.oh_item_names(), ping_timedelta, default=sml_iskra.default) 
                     and oh_connection.check_if_updated(ExtendedSmartMeterValues.oh_item_names(), ping_timedelta)):
                 break
             ping_succeeded=True

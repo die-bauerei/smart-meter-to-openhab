@@ -1,15 +1,70 @@
 import serial
 from datetime import timedelta, datetime
 from logging import Logger
+from typing import Protocol, List, Any
+from functools import cached_property
 from .interfaces import SmartMeterValues
 
-class SmlIskraMt175():
+MIN_REF_VALUE_IN_WATT=50
+def _has_outlier(value_list : List[Any], ref_value_list : List[Any]) -> bool:
+    for i in range(len(value_list)):
+        if value_list[i] is not None and ref_value_list[i] is not None and value_list[i]*0.001 > max(ref_value_list[i], MIN_REF_VALUE_IN_WATT):
+            return True
+    return False
+
+class SmartMeterReader(Protocol):
+    @cached_property
+    def default(self) -> SmartMeterValues:
+        ...
+    
+    def read(self, ref_values : SmartMeterValues) -> SmartMeterValues:
+        ...
+
+# The smart meter supports consumption only. No electricity feed-in support! (German: Zweirichtungszähler)
+class SmlIskraMt175OneWay():
     def __init__(self, serial_port : str, logger : Logger) -> None:
         self._port=serial.Serial(baudrate=9600, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
         self._serial_port=serial_port
         self._logger=logger
 
-    def read(self, time_out : timedelta = timedelta(seconds=5)) -> SmartMeterValues:
+    @cached_property
+    def default(self) -> SmartMeterValues:
+        return SmartMeterValues(overall_consumption=0, phase_1_consumption=0, phase_2_consumption=0, phase_3_consumption=0)
+
+    def read(self, ref_values : SmartMeterValues) -> SmartMeterValues:
+        """Read data from the smart meter via SML and try to validate them
+
+        Parameters
+        ----------
+        ref_values : SmartMeterValues
+            Values that are used as baseline to detect outliers
+        
+        Returns
+        -------
+        SmartMeterValues
+            Contains the data read from the smart meter
+        """
+        ref_value_list=ref_values.value_list()
+        values=SmartMeterValues()
+        for i in range(4): # try n times to get a valid read
+            values=self._read_raw()
+            if values.is_invalid():
+                self._logger.info(f"Detected invalid values during SML read. Trying again")
+                continue
+            value_list=values.value_list()
+            if _has_outlier(value_list, ref_value_list):
+                self._logger.info(f"Detected unrealistic values during SML read. Trying again")
+                continue
+            break
+
+        value_list=values.value_list()
+        if values.is_invalid() or _has_outlier(value_list, ref_value_list):
+            self._logger.warning(f"Unable to read and validate SML data. Ignoring following values: {values}")
+            values.reset()
+
+        return values if values.is_valid() else self.default
+
+    def _read_raw(self, time_out : timedelta = timedelta(seconds=4)) -> SmartMeterValues:
         """Read raw data from the smart meter via SML
 
         Parameters
@@ -65,9 +120,8 @@ class SmlIskraMt175():
             if (datetime.now() - time_start) > time_out:
                 self._logger.warning(f"Exceeded time out of {time_out} while reading from smart meter.")
         except serial.SerialException as e:
-            self._logger.warning("Caught Exception: " + str(e))
-            self._logger.warning("Returning None values.")
-            self._port.close()
+            self._logger.info("Caught Exception: " + str(e))
+            #self._port.close() # TODO: is this needed? 
             smart_meter_values.reset()
         
         return smart_meter_values
