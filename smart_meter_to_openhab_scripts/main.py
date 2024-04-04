@@ -38,11 +38,10 @@ def create_args_parser() -> argparse.ArgumentParser:
                         or by any other means (e.g. in your ~/.profile)")
     parser.add_argument("-c", "--smart_meter_read_count", type=int, required=False, default=5, 
                         help="Specifies the number of performed reads that are averaged per interval. Between each read is a sleep of 1 sec.")
-    parser.add_argument("--interval_in_sec", type=int, required=False, default=10, help="Interval in which the data will be read and pushed")
-    parser.add_argument("--ping_in_min", type=int, required=False, default=10, help="Reinit if no data can be found in the openHAB DB in the given timeframe")
     parser.add_argument("--max_reinit", type=int, required=False, default=5, help="Exit process with Return Code 1 when pinging stays unsuccessful.")
     parser.add_argument('--uhubctl', action='store_true', help="Use uhubctl to power off and on the usb port on reinit")
     parser.add_argument("--logfile", type=Path, required=False, help="Write logging to this file instead of to stdout")
+    parser.add_argument("--raw_data_dump_dir", type=Path, required=False, help="Dump raw data of unsuccessful reads to this folder.")
     parser.add_argument('-v', '--verbose', action='count', default=0)
     return parser
 
@@ -52,7 +51,8 @@ def _exec_process(params : List[str]) -> None:
     if rc != 0:
         raise Exception("Failed to execute command "+ ' '.join(params)+". Return code was: "+str(result.returncode))
 
-def _run(process_start_time : datetime, logger : logging.Logger, read_count : int, interval_in_sec : int, ping_in_min : int, use_uhubctl : bool) -> bool:
+def _run(process_start_time : datetime, logger : logging.Logger, read_count : int, use_uhubctl : bool, 
+         raw_data_dump_dir : Union[Path, None] = None) -> bool:
     from smart_meter_to_openhab.openhab import OpenhabConnection
     from smart_meter_to_openhab.sml_iskra_mt175 import SmlIskraMt175OneWay
     from smart_meter_to_openhab.sml_reader import SmlReader
@@ -61,10 +61,11 @@ def _run(process_start_time : datetime, logger : logging.Logger, read_count : in
     oh_user=os.getenv('OH_USER') if 'OH_USER' in os.environ else ''
     oh_passwd=os.getenv('OH_PASSWD') if 'OH_PASSWD' in os.environ else ''
     oh_connection = OpenhabConnection(os.getenv('OH_HOST'), oh_user, oh_passwd, logger) # type: ignore
-    sml_iskra = SmlIskraMt175OneWay('/dev/ttyUSB0', logger)
+    sml_iskra = SmlIskraMt175OneWay('/dev/ttyUSB0', logger, raw_data_dump_dir)
     sml_reader = SmlReader(logger)
     logger.info("Connections established. Starting to transfer smart meter values to openhab.")
-    ping_timedelta = timedelta(minutes=ping_in_min)
+    ping_timedelta = timedelta(seconds=read_count*sml_iskra.estimated_max_read_time_in_sec*2)
+    logger.info(f"Calculated ping_timedelta is {ping_timedelta}. Process will be reinit if no data can be found in the openHAB DB in the given timeframe.")
     ping_succeeded=False
     while True:
         logger.info("Reading SML data")
@@ -76,7 +77,6 @@ def _run(process_start_time : datetime, logger : logging.Logger, read_count : in
         oh_connection.post_to_items(values)
         oh_connection.post_to_items(extended_values)
         logger.info("Values posted to openHAB")
-        sleep(interval_in_sec) # TODO: rm this variable?
         # start pinging after process is running for the specified time
         if (datetime.now() - process_start_time) > ping_timedelta:
             if not (oh_connection.check_if_updated(SmartMeterValues.oh_item_names(), ping_timedelta, default=sml_iskra.default) 
@@ -105,10 +105,11 @@ def main() -> None:
     logger.info(f"Starting smart_meter_to_openhab version {__version__}")
     logger.setLevel(log_level_from_arg(args.verbose))
     try:
+        raw_data_dump_dir=args.raw_data_dump_dir if args.raw_data_dump_dir else None
         process_start_time=datetime.now()
         unsuccessful_reinit_count=0
         while unsuccessful_reinit_count < args.max_reinit:
-            if _run(process_start_time, logger, args.smart_meter_read_count, args.interval_in_sec, args.ping_in_min, args.uhubctl):
+            if _run(process_start_time, logger, args.smart_meter_read_count, args.uhubctl, raw_data_dump_dir):
                 unsuccessful_reinit_count=0
             else:
                 unsuccessful_reinit_count+=1
