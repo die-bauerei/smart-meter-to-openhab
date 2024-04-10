@@ -2,7 +2,7 @@ import serial
 import os
 from datetime import timedelta, datetime
 from logging import Logger
-from typing import Protocol, List, Any, Union
+from typing import Protocol, List, Any, Optional
 from functools import cached_property
 from pathlib import Path
 from .interfaces import SmartMeterValues
@@ -23,6 +23,7 @@ class SmartMeterReader(Protocol):
     def estimated_max_read_time_in_sec(self) -> int:
         ...
     
+    # TODO: this function can already be implemented in an abstract class
     def read(self, ref_values : SmartMeterValues) -> SmartMeterValues:
         ...
 
@@ -34,17 +35,18 @@ class SmlIskraMt175OneWay():
     # try n times to get a valid raw read
     _max_read_attempts : int = 4
 
-    def __init__(self, serial_port : str, logger : Logger, raw_data_dump_dir : Union[Path, None] = None) -> None:
+    def __init__(self, serial_port : str, logger : Logger, raw_data_dump_dir : Optional[Path] = None) -> None:
         self._port=serial.Serial(baudrate=9600, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
         self._serial_port=serial_port
         self._logger=logger
         self._latest_raw_data=''
         self._raw_data_dump_dir=raw_data_dump_dir
-        self._raw_data_dump_counter=0
-
-    def __post_init__(self) -> None:
+        self._raw_data_dump_invalid_counter=0
+        self._raw_data_dump_outlier_counter=0
+        # TODO: add a possibility to dump raw data for valid cases aswell (e.g. when logger.debug)
         if self._raw_data_dump_dir:
             os.makedirs(self._raw_data_dump_dir, exist_ok=True)
+            self._logger.info(f"Using directory {self._raw_data_dump_dir} for raw data dumps.")
 
     @cached_property
     def default(self) -> SmartMeterValues:
@@ -73,10 +75,18 @@ class SmlIskraMt175OneWay():
             values=self._read_raw()
             if values.is_invalid():
                 self._logger.info(f"Detected invalid values during SML read. Trying again")
+                if self._raw_data_dump_dir:
+                    with open(self._raw_data_dump_dir / f"raw_data_dump_invalid_{self._raw_data_dump_invalid_counter}.sml", 'w') as f:
+                        f.write(self._latest_raw_data)
+                    self._raw_data_dump_invalid_counter+=1
                 continue
             value_list=values.value_list()
             if _has_outlier(value_list, ref_value_list):
                 self._logger.info(f"Detected unrealistic values during SML read. Trying again")
+                if self._raw_data_dump_dir:
+                    with open(self._raw_data_dump_dir / f"raw_data_dump_outlier_{self._raw_data_dump_outlier_counter}.sml", 'w') as f:
+                        f.write(self._latest_raw_data)
+                    self._raw_data_dump_outlier_counter+=1
                 continue
             break
 
@@ -84,11 +94,6 @@ class SmlIskraMt175OneWay():
         if values.is_invalid() or _has_outlier(value_list, ref_value_list):
             self._logger.warning(f"Unable to read and validate SML data. Ignoring following values: {values}")
             values.reset()
-
-        if self._raw_data_dump_dir and values.is_invalid():
-            with open(self._raw_data_dump_dir / f"raw_data_dump_{self._raw_data_dump_counter}.sml", 'w') as f:
-                f.write(self._latest_raw_data)
-            self._raw_data_dump_counter+=1
 
         return values if values.is_valid() else self.default
 
@@ -106,6 +111,14 @@ class SmlIskraMt175OneWay():
         SmartMeterValues
             Contains the data read from the smart meter
         """
+
+        def _convert_to_float(pos_begin : int, pos_end : int) -> Optional[float]:
+            try:
+                return int(self._latest_raw_data[pos_begin:pos_end], 16)
+            except Exception as e:
+                self._logger.info("Caught Exception in _read_raw.__convert_to_float: " + str(e))
+                return None
+
         self._latest_raw_data = ''
         smart_meter_values=SmartMeterValues()
         try:
@@ -129,26 +142,28 @@ class SmlIskraMt175OneWay():
                     self._latest_raw_data = self._latest_raw_data[0:pos + 16]                # cut trash after end delimiter
                     
                     pos = self._latest_raw_data.find('070100010800ff') # looking for OBIS Code: 1-0:1.8.0*255 - Energy kWh
-                    smart_meter_values.electricity_meter.value = int(self._latest_raw_data[pos+36:pos + 52], 16) / 1e4 if pos != -1 else None
+                    smart_meter_values.electricity_meter.value = _convert_to_float(pos+36, pos+52) if pos != -1 else None
+                    if smart_meter_values.electricity_meter.value is not None:
+                        smart_meter_values.electricity_meter.value /= 1e4
 
                     pos = self._latest_raw_data.find('070100100700ff') # looking for OBIS Code: 1-0:16.7.0*255 - Sum Power L1,L2,L3
-                    smart_meter_values.overall_consumption.value = int(self._latest_raw_data[pos+28:pos+36], 16) if pos != -1 else None
+                    smart_meter_values.overall_consumption.value = _convert_to_float(pos+28, pos+36) if pos != -1 else None
 
                     pos = self._latest_raw_data.find('070100240700ff') # looking for OBIS Code: 1-0:36.7.0*255 - current Power L1
-                    smart_meter_values.phase_1_consumption.value = int(self._latest_raw_data[pos+28:pos+36], 16) if pos != -1 else None
+                    smart_meter_values.phase_1_consumption.value = _convert_to_float(pos+28, pos+36) if pos != -1 else None
 
                     pos = self._latest_raw_data.find('070100380700ff') # looking for OBIS Code: 1-0:56.7.0*255 - current Power L2
-                    smart_meter_values.phase_2_consumption.value = int(self._latest_raw_data[pos+28:pos+36], 16) if pos != -1 else None
+                    smart_meter_values.phase_2_consumption.value = _convert_to_float(pos+28, pos+36) if pos != -1 else None
 
                     pos = self._latest_raw_data.find('0701004c0700ff') # looking for OBIS Code: 1-0:76.7.0*255 - current Power L3
-                    smart_meter_values.phase_3_consumption.value = int(self._latest_raw_data[pos+28:pos+36], 16) if pos != -1 else None
+                    smart_meter_values.phase_3_consumption.value = _convert_to_float(pos+28, pos+36) if pos != -1 else None
 
                     break
             
             if (datetime.now() - time_start) > time_out:
                 self._logger.warning(f"Exceeded time out of {time_out} while reading from smart meter.")
         except serial.SerialException as e:
-            self._logger.info("Caught Exception: " + str(e))
+            self._logger.info("Caught Exception in _read_raw: " + str(e))
             #self._port.close() # TODO: is this needed? 
             smart_meter_values.reset()
         

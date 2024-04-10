@@ -76,7 +76,7 @@ class OhItemAndValueContainer(ABC):
     
     def __eq__(self, other) -> bool:
         if isinstance(other, OhItemAndValueContainer):
-            return self._oh_items_and_values == other._oh_items_and_values
+            return self.value_list() == other.value_list()
         return False
     
     @staticmethod    

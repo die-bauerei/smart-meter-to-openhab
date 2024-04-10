@@ -56,7 +56,7 @@ def _run(process_start_time : datetime, logger : logging.Logger, read_count : in
     from smart_meter_to_openhab.openhab import OpenhabConnection
     from smart_meter_to_openhab.sml_iskra_mt175 import SmlIskraMt175OneWay
     from smart_meter_to_openhab.sml_reader import SmlReader
-    from smart_meter_to_openhab.interfaces import SmartMeterValues, ExtendedSmartMeterValues
+    from smart_meter_to_openhab.interfaces import SmartMeterValues
 
     oh_user=os.getenv('OH_USER') if 'OH_USER' in os.environ else ''
     oh_passwd=os.getenv('OH_PASSWD') if 'OH_PASSWD' in os.environ else ''
@@ -64,8 +64,8 @@ def _run(process_start_time : datetime, logger : logging.Logger, read_count : in
     sml_iskra = SmlIskraMt175OneWay('/dev/ttyUSB0', logger, raw_data_dump_dir)
     sml_reader = SmlReader(logger)
     logger.info("Connections established. Starting to transfer smart meter values to openhab.")
-    ping_timedelta = timedelta(seconds=read_count*sml_iskra.estimated_max_read_time_in_sec*2)
-    logger.info(f"Calculated ping_timedelta is {ping_timedelta}. Process will be reinit if no data can be found in the openHAB DB in the given timeframe.")
+    ping_timedelta = timedelta(seconds=read_count*sml_iskra.estimated_max_read_time_in_sec*2.5)
+    logger.info(f"Calculated ping_timedelta is {ping_timedelta}. Process will be reinit if no data change is detected in the openHAB DB in the given timeframe.")
     ping_succeeded=False
     while True:
         logger.info("Reading SML data")
@@ -79,8 +79,7 @@ def _run(process_start_time : datetime, logger : logging.Logger, read_count : in
         logger.info("Values posted to openHAB")
         # start pinging after process is running for the specified time
         if (datetime.now() - process_start_time) > ping_timedelta:
-            if not (oh_connection.check_if_updated(SmartMeterValues.oh_item_names(), ping_timedelta, default=sml_iskra.default) 
-                    and oh_connection.check_if_updated(ExtendedSmartMeterValues.oh_item_names(), ping_timedelta)):
+            if not oh_connection.check_if_persistence_values_updated(SmartMeterValues.oh_item_names(), ping_timedelta, default=sml_iskra.default):
                 break
             ping_succeeded=True
             logger.info("openHAB items ping successful.")

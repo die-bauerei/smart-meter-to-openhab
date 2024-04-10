@@ -12,13 +12,44 @@ from .interfaces import *
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+def _convert_list_to_smart_meter_values(oh_item_names : SmartMeterOhItemNames, 
+                                       list_values : List[List[float]]) -> List[SmartMeterValues]:
+    smart_meter_values : List[SmartMeterValues] = []
+    valid_items=[item for item in oh_item_names if item]
+    for value_index in range(len(list_values[0]) if list_values else 0):
+        item_value_list : List[OhItemAndValue] = []
+        for item_index, item in enumerate(valid_items):
+            item_value_list.append(OhItemAndValue(item, list_values[item_index][value_index]))
+        smart_meter_values.append(SmartMeterValues.create(item_value_list))
+    return smart_meter_values
+
+def _check_if_updated(values : List[SmartMeterValues], default : Union[SmartMeterValues, None] = None) -> bool:
+    valid_default=default is not None and default.is_valid()
+    valid_values=[value for value in values if value.is_valid()]
+    for value in valid_values:
+        if valid_default and value == default: # consider a valid default value as updated
+            return True
+        elif value != valid_values[0]:
+            return True
+    return False
+
+def _get_median(oh_item_names : SmartMeterOhItemNames, list_values : List[List[float]]) -> SmartMeterValues:
+    smart_meter_values : List[OhItemAndValue] = []
+    value_index=0
+    for item in oh_item_names:
+        if item:
+            avg_value = median(list_values[value_index]) if len(list_values[value_index]) > 1 else None
+            smart_meter_values.append(OhItemAndValue(item, avg_value))
+            value_index+=1
+    return SmartMeterValues.create(smart_meter_values)
+
 class OpenhabConnection():
     def __init__(self, oh_host : str, oh_user : str, oh_passwd : str, logger : Logger) -> None:
         self._oh_host=oh_host
         self._session=requests.Session()
         if oh_user:
             self._session.auth=HTTPBasicAuth(oh_user, oh_passwd)
-        retries=Retry(total=5,
+        retries=Retry(total=10,
                 backoff_factor=0.1,
                 status_forcelist=[ 500, 502, 503, 504 ])
         self._session.mount('http://', HTTPAdapter(max_retries=retries))
@@ -79,24 +110,18 @@ class OpenhabConnection():
                 pers_values.append(values)
         return pers_values
 
-    def check_if_updated(self, oh_item_names : Tuple[str, ...], timedelta : datetime.timedelta, 
-                         default : Union[SmartMeterValues, ExtendedSmartMeterValues, None] = None) -> bool:
+    def check_if_persistence_values_updated(self, oh_item_names : SmartMeterOhItemNames, timedelta : datetime.timedelta, 
+                         default : Union[SmartMeterValues, None] = None) -> bool:
         pers_values=self._get_persistence_values(oh_item_names, timedelta)
-        for values in pers_values:
-            if default is not None and default.is_valid() and any(i == default for i in values): # consider a valid default value as updated
-                return True
-            elif any(i != values[0] for i in values):
-                return True
-        return False
+        if pers_values and any(len(values) != len(pers_values[0]) for values in pers_values):
+            # return True in case the input lists are of unequal size
+            # NOTE: This happens if the GET/POST requests to Openhab have not been completely successful.
+            return True
+        
+        smart_meter_values=_convert_list_to_smart_meter_values(oh_item_names, pers_values)
+        return _check_if_updated(smart_meter_values, default)
 
-    def get_median_from_items(self, oh_item_names : SmartMeterOhItemNames, timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:
-        smart_meter_values : List[OhItemAndValue] = []
+    def get_median_from_items(self, oh_item_names : SmartMeterOhItemNames, 
+                              timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:
         pers_values=self._get_persistence_values(oh_item_names, timedelta)
-        value_index=0
-        for item in oh_item_names:
-            if item:
-                avg_value = median(pers_values[value_index]) if len(pers_values[value_index]) > 10 else None
-                smart_meter_values.append(OhItemAndValue(item, avg_value))
-                value_index+=1
-        return SmartMeterValues.create(smart_meter_values)
-
+        return _get_median(oh_item_names, pers_values)

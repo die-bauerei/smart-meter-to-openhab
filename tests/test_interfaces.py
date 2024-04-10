@@ -119,6 +119,13 @@ class TestInterfaces(unittest.TestCase):
         values_3=SmartMeterValues(200, 300, 400, 600, 2.5)
         self.assertNotEqual(values_1, values_3)
 
+        # Unspecified oh items (empty env variable) should NOT be used for value comparison
+        oh_item_names : SmartMeterOhItemNames = ('', '', '', SmartMeterValues.oh_item_names()[3], SmartMeterValues.oh_item_names()[4])
+        all_values_partial_items=SmartMeterValues(1, 2, 3, 4, 5, oh_item_names)
+        self.assertEqual(all_values_partial_items, SmartMeterValues(None, None, None, 4, 5, oh_item_names))
+        self.assertEqual(all_values_partial_items, SmartMeterValues(10, 20, 30, 4, 5, oh_item_names))
+        self.assertNotEqual(all_values_partial_items, SmartMeterValues(10, 20, 30, 40, 5, oh_item_names))
+
     def test_shared_oh_items(self) -> None:
         value_1=SmartMeterValues(1, 2, 3, 4, 5)
         value_2=SmartMeterValues(6, 7, 8, 9, 10)

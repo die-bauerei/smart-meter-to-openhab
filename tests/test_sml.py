@@ -60,7 +60,7 @@ class TestSml(unittest.TestCase):
         ref_values=SmartMeterValues(50, 50, 50, 50, 50)
         read_values=reader.read_avg_from_sml(self._test_reader, read_count=1, ref_values=ref_values)
         self.assertEqual(TestSml._test_values[0], read_values)
-        # TODO: reactivate this test
+        # TODO:  reactivate this test (test TestSmlReader.read)
         # If there is an outlier, all return values should be None
         #TestSml._function_call_count=0
         #TestSml._test_values[0].phase_1_consumption.value=1000000
