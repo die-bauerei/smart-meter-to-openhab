@@ -61,7 +61,7 @@ class OhItemAndValueContainer(ABC):
                     break
 
     def __iter__(self) -> Iterator[OhItemAndValue]:
-        return iter(self._oh_items_and_values)                
+        return iter(self._oh_items_and_values)
     
     def is_invalid(self) -> bool:
         # consider only the values that really will be used (oh_item name not empty)
@@ -78,12 +78,6 @@ class OhItemAndValueContainer(ABC):
         if isinstance(other, OhItemAndValueContainer):
             return self.value_list() == other.value_list()
         return False
-    
-    @staticmethod    
-    def create_container(values : List[OhItemAndValue], oh_item_names : Tuple[str,...]) -> OhItemAndValueContainer:
-        value_container=OhItemAndValueContainer(oh_item_names)
-        value_container.assign_values(values)
-        return value_container
     
 # NOTE: Use a tuple (immutable type) here to prevent changing the values 
 SmartMeterOhItemNames = Tuple[str, str, str, str, str]
@@ -130,8 +124,9 @@ class SmartMeterValues(OhItemAndValueContainer):
 
     @staticmethod    
     def create(values : List[OhItemAndValue], user_specified_oh_item_names : Union[SmartMeterOhItemNames, None] = None) -> SmartMeterValues:
-        oh_items = user_specified_oh_item_names if user_specified_oh_item_names is not None else SmartMeterValues.oh_item_names()
-        return cast(SmartMeterValues, OhItemAndValueContainer.create_container(values, oh_items))
+        value=SmartMeterValues(user_specified_oh_item_names=user_specified_oh_item_names)
+        value.assign_values(values)
+        return value
     
     @staticmethod
     def create_avg(values : List[SmartMeterValues], user_specified_oh_item_names : Union[SmartMeterOhItemNames, None] = None) -> SmartMeterValues:
@@ -179,5 +174,6 @@ class ExtendedSmartMeterValues(OhItemAndValueContainer):
 
     @staticmethod    
     def create(values : List[OhItemAndValue], user_specified_oh_item_names : Union[ExtendedSmartMeterOhItemNames, None] = None) -> ExtendedSmartMeterValues:
-        oh_items = user_specified_oh_item_names if user_specified_oh_item_names is not None else ExtendedSmartMeterValues.oh_item_names()
-        return cast(ExtendedSmartMeterValues, OhItemAndValueContainer.create_container(values, oh_items))
+        value=ExtendedSmartMeterValues(user_specified_oh_item_name=user_specified_oh_item_names)
+        value.assign_values(values)
+        return value

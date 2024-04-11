@@ -29,17 +29,18 @@ pip install smart-meter-to-openhab
 ```
 6. Provide environment variables. You can e.g. pass a .env file to smart-meter-to-openhab via the option *--dotenv_path*. Or provide them by any other means (e.g. in your ~/.profile).
 ```bash
-# Hostname incl. http(s)
+# Hostname incl. http(s) (required)
 OH_HOST='<http://your_ip:your_port'
 #openhab user (or token) for login (optional)
 OH_USER=''
 #openhab password for login (optional)
 OH_PASSWD=''
-#openhab item names. Optional, but recommended :) 
+#current consumption openhab item (required)
+OVERALL_CONSUMPTION_WATT_OH_ITEM='smart_meter_overall_consumption'
+#other openhab item names (optional)
 PHASE_1_CONSUMPTION_WATT_OH_ITEM='smart_meter_phase_1_consumption'
 PHASE_2_CONSUMPTION_WATT_OH_ITEM='smart_meter_phase_2_consumption'
 PHASE_3_CONSUMPTION_WATT_OH_ITEM='smart_meter_phase_3_consumption'
-OVERALL_CONSUMPTION_WATT_OH_ITEM='smart_meter_overall_consumption'
 OVERALL_CONSUMPTION_WH_OH_ITEM='smart_meter_overall_consumption_wh'
 ELECTRICITY_METER_KWH_OH_ITEM='smart_meter_electricity_meter'
 ```

@@ -4,7 +4,7 @@ import datetime
 from logging import Logger
 from requests.auth import HTTPBasicAuth
 from requests.adapters import HTTPAdapter, Retry
-from typing import List, Tuple, Union
+from typing import List, Tuple
 from statistics import median
 from .interfaces import *
 
@@ -23,14 +23,19 @@ def _convert_list_to_smart_meter_values(oh_item_names : SmartMeterOhItemNames,
         smart_meter_values.append(SmartMeterValues.create(item_value_list))
     return smart_meter_values
 
-def _check_if_updated(values : List[SmartMeterValues], default : Union[SmartMeterValues, None] = None) -> bool:
-    valid_default=default is not None and default.is_valid()
-    valid_values=[value for value in values if value.is_valid()]
-    for value in valid_values:
-        if valid_default and value == default: # consider a valid default value as updated
-            return True
-        elif value != valid_values[0]:
-            return True
+def _check_if_updated(values : List[SmartMeterValues]) -> bool:
+    valid_values : List[SmartMeterValues] = [value for value in values if value.is_valid()]
+    if len(valid_values) < 2:
+        return False
+
+    # no consumption is good and considered as updated
+    if all((value.overall_consumption.value is not None and value.overall_consumption.value == 0) for value in valid_values):
+        return True
+    
+    # for all other cases, at least one value has to be different
+    if any(value != valid_values[0] for value in valid_values):
+        return True
+    
     return False
 
 def _get_median(oh_item_names : SmartMeterOhItemNames, list_values : List[List[float]]) -> SmartMeterValues:
@@ -49,7 +54,7 @@ class OpenhabConnection():
         self._session=requests.Session()
         if oh_user:
             self._session.auth=HTTPBasicAuth(oh_user, oh_passwd)
-        retries=Retry(total=10,
+        retries=Retry(total=5,
                 backoff_factor=0.1,
                 status_forcelist=[ 500, 502, 503, 504 ])
         self._session.mount('http://', HTTPAdapter(max_retries=retries))
@@ -89,10 +94,8 @@ class OpenhabConnection():
         return ExtendedSmartMeterValues.create(self.get_item_value_list_from_items(oh_item_names))
 
     PersistenceValuesType = List[List[float]]
-    def _get_persistence_values(self, oh_item_names : Tuple[str, ...], timedelta : datetime.timedelta) -> PersistenceValuesType:
+    def _get_persistence_values(self, oh_item_names : Tuple[str, ...], start_time : datetime.datetime, end_time : datetime.datetime) -> PersistenceValuesType:
         pers_values = []
-        end_time=datetime.datetime.now()
-        start_time=end_time-timedelta
         for item in oh_item_names:
             if item:
                 values=[]
@@ -110,18 +113,20 @@ class OpenhabConnection():
                 pers_values.append(values)
         return pers_values
 
-    def check_if_persistence_values_updated(self, oh_item_names : SmartMeterOhItemNames, timedelta : datetime.timedelta, 
-                         default : Union[SmartMeterValues, None] = None) -> bool:
-        pers_values=self._get_persistence_values(oh_item_names, timedelta)
+    def check_if_persistence_values_updated(self, oh_item_names : SmartMeterOhItemNames, start_time : datetime.datetime, end_time : datetime.datetime) -> bool:
+        pers_values=self._get_persistence_values(oh_item_names, start_time, end_time)
         if pers_values and any(len(values) != len(pers_values[0]) for values in pers_values):
             # return True in case the input lists are of unequal size
             # NOTE: This happens if the GET/POST requests to Openhab have not been completely successful.
+            self._logger.warning("Persistence values are of unequal size. Assuming they have been updated.")
             return True
         
         smart_meter_values=_convert_list_to_smart_meter_values(oh_item_names, pers_values)
-        return _check_if_updated(smart_meter_values, default)
+        return _check_if_updated(smart_meter_values)
 
     def get_median_from_items(self, oh_item_names : SmartMeterOhItemNames, 
                               timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:
-        pers_values=self._get_persistence_values(oh_item_names, timedelta)
+        end_time=datetime.datetime.now()
+        start_time=end_time-timedelta
+        pers_values=self._get_persistence_values(oh_item_names, start_time, end_time)
         return _get_median(oh_item_names, pers_values)

@@ -28,6 +28,9 @@ class TestOpenhabUtils(unittest.TestCase):
         self.assertEqual(smart_meter_values[0], smv_1)
         self.assertEqual(smart_meter_values[1], smv_2)
         self.assertEqual(smart_meter_values[2], smv_3)
+        self.assertIsInstance(smart_meter_values[0], SmartMeterValues)
+        self.assertIsInstance(smart_meter_values[1], SmartMeterValues)
+        self.assertIsInstance(smart_meter_values[2], SmartMeterValues)
 
         # an empty list has to be supported
         self.assertFalse(_convert_list_to_smart_meter_values(oh_item_names, []))
@@ -37,26 +40,25 @@ class TestOpenhabUtils(unittest.TestCase):
             _convert_list_to_smart_meter_values(oh_item_names, [[1,2,3],[4,5]])
 
     def test_check_if_updated(self) -> None:
-        default=SmartMeterValues(overall_consumption=0, phase_1_consumption=0, phase_2_consumption=0, phase_3_consumption=0)
         invalid=SmartMeterValues()
         valid_all_1=SmartMeterValues(100, 200, 300, 400, 500)
         valid_all_2=SmartMeterValues(10, 20, 30, 40, 50)
         valid_partial=SmartMeterValues(electricity_meter=100)
-        self.assertTrue(default.is_valid())
+        zeros=SmartMeterValues(0, 0, 0, 0, electricity_meter=100)
         self.assertTrue(invalid.is_invalid())
         self.assertTrue(valid_all_1.is_valid())
         self.assertTrue(valid_all_2.is_valid())
         self.assertTrue(valid_partial.is_valid())
 
-        self.assertFalse(_check_if_updated(values=[valid_all_1, invalid], default=default))
-        self.assertFalse(_check_if_updated(values=[valid_all_1, valid_all_1], default=default))
-        self.assertFalse(_check_if_updated([],default))
-        self.assertFalse(_check_if_updated(values=[valid_all_1], default=default))
-        self.assertTrue(_check_if_updated(values=[valid_all_1, valid_all_2], default=default))
-        self.assertTrue(_check_if_updated(values=[valid_all_1, default], default=default))
-        self.assertTrue(_check_if_updated(values=[default, default], default=default))
-        self.assertTrue(_check_if_updated(values=[valid_all_1, valid_partial], default=default))
-        self.assertTrue(_check_if_updated(values=[default], default=default))
+        self.assertFalse(_check_if_updated(values=[valid_all_1, invalid]))
+        self.assertFalse(_check_if_updated(values=[valid_all_1, valid_all_1]))
+        self.assertFalse(_check_if_updated([]))
+        self.assertFalse(_check_if_updated(values=[valid_all_1]))
+        self.assertFalse(_check_if_updated(values=[zeros]))
+        self.assertTrue(_check_if_updated(values=[zeros, zeros]))
+        self.assertTrue(_check_if_updated(values=[valid_all_1, valid_all_2]))
+        self.assertTrue(_check_if_updated(values=[valid_all_1, zeros]))
+        self.assertTrue(_check_if_updated(values=[valid_all_1, valid_partial]))
         
 if __name__ == '__main__':
     try:

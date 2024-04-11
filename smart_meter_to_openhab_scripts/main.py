@@ -51,12 +51,12 @@ def _exec_process(params : List[str]) -> None:
     if rc != 0:
         raise Exception("Failed to execute command "+ ' '.join(params)+". Return code was: "+str(result.returncode))
 
-def _run(process_start_time : datetime, logger : logging.Logger, read_count : int, use_uhubctl : bool, 
-         raw_data_dump_dir : Union[Path, None] = None) -> bool:
+def _run(logger : logging.Logger, read_count : int, use_uhubctl : bool, raw_data_dump_dir : Union[Path, None] = None) -> bool:
     from smart_meter_to_openhab.openhab import OpenhabConnection
     from smart_meter_to_openhab.sml_iskra_mt175 import SmlIskraMt175OneWay
     from smart_meter_to_openhab.sml_reader import SmlReader
     from smart_meter_to_openhab.interfaces import SmartMeterValues
+    from smart_meter_to_openhab.utils import add_value_to_rolling_list
 
     oh_user=os.getenv('OH_USER') if 'OH_USER' in os.environ else ''
     oh_passwd=os.getenv('OH_PASSWD') if 'OH_PASSWD' in os.environ else ''
@@ -64,8 +64,11 @@ def _run(process_start_time : datetime, logger : logging.Logger, read_count : in
     sml_iskra = SmlIskraMt175OneWay('/dev/ttyUSB0', logger, raw_data_dump_dir)
     sml_reader = SmlReader(logger)
     logger.info("Connections established. Starting to transfer smart meter values to openhab.")
-    ping_timedelta = timedelta(seconds=read_count*sml_iskra.estimated_max_read_time_in_sec*2.5)
+    desired_number_of_persistence_values=4
+    datetimes_before_post_to_oh=[datetime.now()]*desired_number_of_persistence_values
+    ping_timedelta = timedelta(seconds=read_count*sml_iskra.estimated_max_read_time_in_sec*desired_number_of_persistence_values)
     logger.info(f"Calculated ping_timedelta is {ping_timedelta}. Process will be reinit if no data change is detected in the openHAB DB in the given timeframe.")
+    run_start_time=datetime.now()
     ping_succeeded=False
     while True:
         logger.info("Reading SML data")
@@ -74,12 +77,16 @@ def _run(process_start_time : datetime, logger : logging.Logger, read_count : in
                                                                                          ref_values=ref_smart_meter_value)
         logger.info(f"current values: {values}")
         logger.info(f"current extended values: {extended_values}")
+        datetimes_before_post_to_oh=add_value_to_rolling_list(datetimes_before_post_to_oh, datetime.now())
         oh_connection.post_to_items(values)
         oh_connection.post_to_items(extended_values)
         logger.info("Values posted to openHAB")
-        # start pinging after process is running for the specified time
-        if (datetime.now() - process_start_time) > ping_timedelta:
-            if not oh_connection.check_if_persistence_values_updated(SmartMeterValues.oh_item_names(), ping_timedelta, default=sml_iskra.default):
+        # start pinging after running for the specified time
+        if (datetime.now() - run_start_time) > ping_timedelta:
+            # NOTE: exclude the latest values since oh sometimes has not handled the post requests from above yet.
+            if not oh_connection.check_if_persistence_values_updated(SmartMeterValues.oh_item_names(), 
+                                                                     start_time=datetimes_before_post_to_oh[0], 
+                                                                     end_time=datetimes_before_post_to_oh[-1]):
                 break
             ping_succeeded=True
             logger.info("openHAB items ping successful.")
@@ -105,10 +112,10 @@ def main() -> None:
     logger.setLevel(log_level_from_arg(args.verbose))
     try:
         raw_data_dump_dir=args.raw_data_dump_dir if args.raw_data_dump_dir else None
-        process_start_time=datetime.now()
+        # TODO: remove the reinit thingy. Let it fail and restart by systemd or so
         unsuccessful_reinit_count=0
         while unsuccessful_reinit_count < args.max_reinit:
-            if _run(process_start_time, logger, args.smart_meter_read_count, args.uhubctl, raw_data_dump_dir):
+            if _run(logger, args.smart_meter_read_count, args.uhubctl, raw_data_dump_dir):
                 unsuccessful_reinit_count=0
             else:
                 unsuccessful_reinit_count+=1
