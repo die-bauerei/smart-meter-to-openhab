@@ -12,8 +12,9 @@ from .interfaces import *
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+PersistenceValuesType = List[List[float]]
 def _convert_list_to_smart_meter_values(oh_item_names : SmartMeterOhItemNames, 
-                                       list_values : List[List[float]]) -> List[SmartMeterValues]:
+                                       list_values : PersistenceValuesType) -> List[SmartMeterValues]:
     smart_meter_values : List[SmartMeterValues] = []
     valid_items=[item for item in oh_item_names if item]
     for value_index in range(len(list_values[0]) if list_values else 0):
@@ -23,19 +24,26 @@ def _convert_list_to_smart_meter_values(oh_item_names : SmartMeterOhItemNames,
         smart_meter_values.append(SmartMeterValues.create(item_value_list))
     return smart_meter_values
 
-def _check_if_updated(values : List[SmartMeterValues]) -> bool:
-    valid_values : List[SmartMeterValues] = [value for value in values if value.is_valid()]
-    if len(valid_values) < 2:
-        return False
+def _convert_smart_meter_values_to_list(values : List[SmartMeterValues]) -> PersistenceValuesType:
+    list_values : PersistenceValuesType = []
+    for i in range(len(SmartMeterValues().value_list())):
+        list_values.append([0]*len(values))
+    for index_set, value_set in enumerate(values):
+         for index_value, value in enumerate(value_set.value_list()):
+             list_values[index_set][index_value]=value
+    return list_values
 
-    # no consumption is good and considered as updated
-    if all((value.overall_consumption.value is not None and value.overall_consumption.value == 0) for value in valid_values):
-        return True
-    
-    # for all other cases, at least one value has to be different
-    if any(value != valid_values[0] for value in valid_values):
-        return True
-    
+# TODO: add to sml interface and implement for iskra mt175
+# NOTE: Use List[List[float]] as input to consider that the count of values can potentially be different per item.
+# This could be some data optimization in openhab or similar. Whatever the reason is, we have to support it.
+def _check_if_updated(pers_values : PersistenceValuesType) -> bool:
+    for values in pers_values:
+        # no consumption is good and considered as updated. All values are same and very very low (but not necessarily 0)
+        if all(value == values[0] for value in values) and all(value < 20 for value in values):
+            return True
+        # for all other cases, at least one value has to be different
+        if any(value != values[0] for value in values):
+            return True
     return False
 
 def _get_median(oh_item_names : SmartMeterOhItemNames, list_values : List[List[float]]) -> SmartMeterValues:
@@ -93,7 +101,6 @@ class OpenhabConnection():
     def get_extended_values_from_items(self, oh_item_names : ExtendedSmartMeterOhItemNames) -> ExtendedSmartMeterValues:
         return ExtendedSmartMeterValues.create(self.get_item_value_list_from_items(oh_item_names))
 
-    PersistenceValuesType = List[List[float]]
     def _get_persistence_values(self, oh_item_names : Tuple[str, ...], start_time : datetime.datetime, end_time : datetime.datetime) -> PersistenceValuesType:
         pers_values = []
         for item in oh_item_names:
@@ -115,14 +122,12 @@ class OpenhabConnection():
 
     def check_if_persistence_values_updated(self, oh_item_names : SmartMeterOhItemNames, start_time : datetime.datetime, end_time : datetime.datetime) -> bool:
         pers_values=self._get_persistence_values(oh_item_names, start_time, end_time)
-        if pers_values and any(len(values) != len(pers_values[0]) for values in pers_values):
-            # return True in case the input lists are of unequal size
-            # NOTE: This happens if the GET/POST requests to Openhab have not been completely successful.
-            self._logger.warning("Persistence values are of unequal size. Assuming they have been updated.")
-            return True
-        
-        smart_meter_values=_convert_list_to_smart_meter_values(oh_item_names, pers_values)
-        return _check_if_updated(smart_meter_values)
+        updated=_check_if_updated(pers_values)
+        if not updated:
+            self._logger.warning("Persistence values have not been updated.")
+            for index, values in enumerate(pers_values):
+                self._logger.warning(f"Values for index {index}: {values}")
+        return updated
 
     def get_median_from_items(self, oh_item_names : SmartMeterOhItemNames, 
                               timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:

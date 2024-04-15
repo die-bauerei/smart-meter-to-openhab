@@ -4,7 +4,6 @@ import logging
 from datetime import timedelta, datetime
 from logging import Logger
 from typing import Protocol, List, Any, Optional
-from functools import cached_property
 from pathlib import Path
 from .interfaces import SmartMeterValues
 
@@ -16,13 +15,6 @@ def _has_outlier(value_list : List[Any], ref_value_list : List[Any]) -> bool:
     return False
 
 class SmartMeterReader(Protocol):
-    @cached_property
-    def default(self) -> SmartMeterValues:
-        ...
-    @cached_property
-    def estimated_max_read_time_in_sec(self) -> int:
-        ...
-    
     # TODO:  this function can already be implemented in an abstract class
     def read(self, ref_values : SmartMeterValues) -> SmartMeterValues:
         ...
@@ -65,9 +57,6 @@ class SmlIskraMt175OneWay():
     # Data reading will be canceled after this time period.
     #      NOTE: Take care that this is longer then the specified transmission time of your smart meter.
     _read_raw_time_out_in_sec : int = 5
-    # try n times to get a valid raw read
-    # TODO: rm this when a value of 1 works
-    _max_read_attempts : int = 1
 
     def __init__(self, serial_port : str, logger : Logger, raw_data_dump_dir : Optional[Path] = None) -> None:
         self._port=serial.Serial(baudrate=9600, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
@@ -81,14 +70,6 @@ class SmlIskraMt175OneWay():
         if self._raw_data_dump_dir:
             os.makedirs(self._raw_data_dump_dir, exist_ok=True)
             self._logger.info(f"Using directory {self._raw_data_dump_dir} for raw data dumps.")
-
-    @cached_property
-    def default(self) -> SmartMeterValues:
-        return SmartMeterValues(overall_consumption=0, phase_1_consumption=0, phase_2_consumption=0, phase_3_consumption=0)
-    
-    @cached_property
-    def estimated_max_read_time_in_sec(self) -> int:
-        return self._read_raw_time_out_in_sec*self._max_read_attempts
 
     def read(self, ref_values : SmartMeterValues) -> SmartMeterValues:
         """Read data from the smart meter via SML and try to validate them
@@ -104,27 +85,21 @@ class SmlIskraMt175OneWay():
             Contains the data read from the smart meter
         """
         ref_value_list=ref_values.value_list()
-        values=SmartMeterValues()
-        for i in range(self._max_read_attempts):
-            values=self._read_raw()
-            if values.is_invalid():
-                self._logger.info(f"Detected invalid values during SML read. Trying again")
-                if self._raw_data_dump_dir:
-                    with open(self._raw_data_dump_dir / f"raw_data_dump_invalid_{self._raw_data_dump_invalid_counter}.sml", 'w') as f:
-                        f.write(self._latest_raw_data)
-                    self._raw_data_dump_invalid_counter+=1
-                continue
-            value_list=values.value_list()
-            if _has_outlier(value_list, ref_value_list):
-                self._logger.info(f"Detected unrealistic values during SML read. Trying again")
-                if self._raw_data_dump_dir:
-                    with open(self._raw_data_dump_dir / f"raw_data_dump_outlier_{self._raw_data_dump_outlier_counter}.sml", 'w') as f:
-                        f.write(self._latest_raw_data)
-                    self._raw_data_dump_outlier_counter+=1
-                continue
-            break
-
+        values=self._read_raw()
+        if values.is_invalid():
+            self._logger.info(f"Detected invalid values during SML read. Trying again")
+            if self._raw_data_dump_dir:
+                with open(self._raw_data_dump_dir / f"raw_data_dump_invalid_{self._raw_data_dump_invalid_counter}.sml", 'w') as f:
+                    f.write(self._latest_raw_data)
+                self._raw_data_dump_invalid_counter+=1
         value_list=values.value_list()
+        if _has_outlier(value_list, ref_value_list):
+            self._logger.info(f"Detected unrealistic values during SML read. Trying again")
+            if self._raw_data_dump_dir:
+                with open(self._raw_data_dump_dir / f"raw_data_dump_outlier_{self._raw_data_dump_outlier_counter}.sml", 'w') as f:
+                    f.write(self._latest_raw_data)
+                self._raw_data_dump_outlier_counter+=1
+
         if values.is_invalid() or _has_outlier(value_list, ref_value_list):
             self._logger.warning(f"Unable to read and validate SML data. Ignoring following values: {values}")
             values.reset()
@@ -134,7 +109,7 @@ class SmlIskraMt175OneWay():
                 f.write(self._latest_raw_data)
             self._raw_data_dump_valid_counter+=1
 
-        return values if values.is_valid() else self.default
+        return values
 
     def _read_raw(self) -> SmartMeterValues:
         """Read raw data from the smart meter via SML

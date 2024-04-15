@@ -64,8 +64,8 @@ class OhItemAndValueContainer(ABC):
         return iter(self._oh_items_and_values)
     
     def is_invalid(self) -> bool:
-        # consider only the values that really will be used (oh_item name not empty)
-        return all(oh_item_value.value is None for oh_item_value in self._oh_items_and_values if oh_item_value.oh_item)
+        number_values=[value for value in self.value_list() if value is not None]
+        return (not number_values) or any(value < 0 for value in number_values)
     
     def is_valid(self) -> bool:
         return not self.is_invalid()

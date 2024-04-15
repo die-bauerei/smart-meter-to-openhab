@@ -18,14 +18,6 @@ class TestSml(unittest.TestCase):
     _function_call_count : int = 0
 
     class TestSmlReader:
-        @cached_property
-        def default(self) -> SmartMeterValues:
-            return SmartMeterValues()
-
-        @cached_property
-        def estimated_max_read_time_in_sec(self) -> int:
-            return 0
-        
         def read(self, ref_values : SmartMeterValues) -> SmartMeterValues:
             values=TestSml._test_values[TestSml._function_call_count]
             TestSml._function_call_count+=1

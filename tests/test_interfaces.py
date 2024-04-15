@@ -106,6 +106,10 @@ class TestInterfaces(unittest.TestCase):
         default_values=SmartMeterValues(overall_consumption=0, phase_1_consumption=0, phase_2_consumption=0, phase_3_consumption=0)
         self.assertFalse(default_values.is_invalid())
 
+        # ALL values have to be positive
+        negative_values=SmartMeterValues(1, -2, 3, -4, 5)
+        self.assertTrue(negative_values.is_invalid())
+
         # NOTE: The value for watt/h is considered in the extended values
         extended_values=ExtendedSmartMeterValues(0.5)
         self.assertFalse(extended_values.is_invalid())
