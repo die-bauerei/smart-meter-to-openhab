@@ -41,7 +41,6 @@ OVERALL_CONSUMPTION_WATT_OH_ITEM='smart_meter_overall_consumption'
 PHASE_1_CONSUMPTION_WATT_OH_ITEM='smart_meter_phase_1_consumption'
 PHASE_2_CONSUMPTION_WATT_OH_ITEM='smart_meter_phase_2_consumption'
 PHASE_3_CONSUMPTION_WATT_OH_ITEM='smart_meter_phase_3_consumption'
-OVERALL_CONSUMPTION_WH_OH_ITEM='smart_meter_overall_consumption_wh'
 ELECTRICITY_METER_KWH_OH_ITEM='smart_meter_electricity_meter'
 ```
 NOTE: certificate verification is turned off, in case *OH_HOST* refers to an https address (since most openHAB instances do probably use self-signed certificates)  

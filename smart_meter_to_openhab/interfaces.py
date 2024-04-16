@@ -1,9 +1,11 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Any, Union, Tuple, ClassVar, cast, Iterator
+from typing import List, Any, Union, Tuple, ClassVar, Iterator
 from statistics import mean
 from abc import ABC
+from functools import cache
 import os
+from .utils import PersistenceValuesType
 
 @dataclass(frozen=True, eq=False)
 class OhItem():
@@ -119,6 +121,7 @@ class SmartMeterValues(OhItemAndValueContainer):
             f"L3={self.phase_3_consumption.value} Overall={self.overall_consumption.value} E={self.electricity_meter.value}"
 
     @staticmethod
+    @cache
     def oh_item_names() -> SmartMeterOhItemNames:
         return SmartMeterValues._oh_item_names
 
@@ -147,33 +150,49 @@ class SmartMeterValues(OhItemAndValueContainer):
         if electricity_meter_value_list: 
             smart_meter_values.electricity_meter.value = mean(electricity_meter_value_list)
         return smart_meter_values
-
-# NOTE: Use a tuple (immutable type) here to prevent changing the values 
-ExtendedSmartMeterOhItemNames = Tuple[str]
-def _read_extended_smart_meter_env() -> ExtendedSmartMeterOhItemNames:
-    return (os.getenv('OVERALL_CONSUMPTION_WH_OH_ITEM', default=''),)
-
-class ExtendedSmartMeterValues(OhItemAndValueContainer):
-    _oh_item_names : ExtendedSmartMeterOhItemNames = _read_extended_smart_meter_env()
-
-    def __init__(self, overall_consumption_wh : Union[float, None] = None,
-                 user_specified_oh_item_name : Union[ExtendedSmartMeterOhItemNames, None] = None) -> None:
-        oh_items = user_specified_oh_item_name if user_specified_oh_item_name is not None else ExtendedSmartMeterValues._oh_item_names
-        super().__init__(oh_items, (overall_consumption_wh,))
-
-    @property
-    def overall_consumption_wh(self) -> OhItemAndValue:
-        return self._oh_items_and_values[0]
-
-    def __repr__(self) -> str:
-        return f"Overall(Wh)={self.overall_consumption_wh.value}"
-
+    
+    # NOTE: Use PersistenceValuesType as input to consider that the count of values can potentially be different per item.
+    # This could be some data optimization in openhab or similar. Whatever the reason is, we have to support it.
     @staticmethod
-    def oh_item_names() -> ExtendedSmartMeterOhItemNames:
-        return ExtendedSmartMeterValues._oh_item_names
+    def check_if_updated(pers_values : PersistenceValuesType) -> bool:
+        # no consumption is good and considered as updated.
+        electricity_meter_values=SmartMeterValues.all_values_for_item(4, pers_values)
+        if len(electricity_meter_values) > 1 and all(value == electricity_meter_values[0] for value in electricity_meter_values):
+            return True
+        
+        # for all other cases, at least one value has to be different
+        for values in pers_values:
+            if any(value != values[0] for value in values):
+                return True
+        return False
+    
+    @staticmethod
+    def all_values_for_item(oh_item_index : int, pers_values : PersistenceValuesType) -> List[float]:
+        if not SmartMeterValues.oh_item_names()[oh_item_index]:
+            return []
 
-    @staticmethod    
-    def create(values : List[OhItemAndValue], user_specified_oh_item_names : Union[ExtendedSmartMeterOhItemNames, None] = None) -> ExtendedSmartMeterValues:
-        value=ExtendedSmartMeterValues(user_specified_oh_item_name=user_specified_oh_item_names)
-        value.assign_values(values)
-        return value
+        pers_value_index=0
+        for i in range(oh_item_index):
+            if SmartMeterValues.oh_item_names()[i]:
+                pers_value_index+=1
+        return pers_values[pers_value_index] if pers_value_index < len(pers_values) else []
+
+def create_from_persistence_values(list_values : PersistenceValuesType) -> List[SmartMeterValues]:
+    smart_meter_values : List[SmartMeterValues] = []
+    valid_items=[item for item in SmartMeterValues.oh_item_names() if item]
+    for value_index in range(len(list_values[0]) if list_values else 0):
+        item_value_list : List[OhItemAndValue] = []
+        for item_index, item in enumerate(valid_items):
+            item_value_list.append(OhItemAndValue(item, list_values[item_index][value_index]))
+        smart_meter_values.append(SmartMeterValues.create(item_value_list))
+    return smart_meter_values
+
+def convert_to_persistence_values(values : List[SmartMeterValues]) -> PersistenceValuesType:
+    list_values : PersistenceValuesType = []
+    for i in range(len(SmartMeterValues().value_list())):
+        list_values.append([])
+    for value_set in values:
+        for index_value, value in enumerate(value_set.value_list()):
+            if SmartMeterValues.oh_item_names()[index_value] and value is not None:
+                list_values[index_value].append(value)
+    return list_values

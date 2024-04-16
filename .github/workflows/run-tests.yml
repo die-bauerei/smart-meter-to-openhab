@@ -6,7 +6,6 @@ env:
   PHASE_2_CONSUMPTION_WATT_OH_ITEM: 'unit_tests_smart_meter_phase_2_consumption'
   PHASE_3_CONSUMPTION_WATT_OH_ITEM: 'unit_tests_smart_meter_phase_3_consumption'
   OVERALL_CONSUMPTION_WATT_OH_ITEM: 'unit_tests_smart_meter_overall_consumption'
-  OVERALL_CONSUMPTION_WH_OH_ITEM: 'unit_tests_smart_meter_overall_consumption_wh'
   ELECTRICITY_METER_KWH_OH_ITEM: 'unit_tests_smart_meter_electricity_meter'
 
 on:
@@ -40,4 +39,4 @@ jobs:
       - name: Run Tests
         run: |
           source .venv/bin/activate
-          python3 -m unittest tests.test_interfaces tests.test_openhab_utils tests.test_sml --verbose
+          python3 -m unittest tests.test_interfaces tests.test_sml_iskra_mt175 tests.test_sml --verbose
