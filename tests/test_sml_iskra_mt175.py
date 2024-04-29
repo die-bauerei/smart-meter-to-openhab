@@ -30,6 +30,22 @@ class TestSmlIskraMt175(unittest.TestCase):
                                            electricity_meter=18998.945)
             self.assertEqual(outlier_value, _decode_sml_iskra_mt175_one_way(f.read()))
 
+        with open(test_path+"/data/iskra_mt175_outlier_2.sml", "r") as f:
+            outlier_value=SmartMeterValues(phase_1_consumption=48, 
+                                           phase_2_consumption=0, 
+                                           phase_3_consumption=14, 
+                                           overall_consumption=0, 
+                                           electricity_meter=641312586937633.0)
+            self.assertEqual(outlier_value, _decode_sml_iskra_mt175_one_way(f.read()))
+
+        with open(test_path+"/data/iskra_mt175_outlier_3.sml", "r") as f:
+            outlier_value=SmartMeterValues(phase_1_consumption=46, 
+                                           phase_2_consumption=0, 
+                                           phase_3_consumption=14, 
+                                           overall_consumption=0, 
+                                           electricity_meter=74.5534)
+            self.assertEqual(outlier_value, _decode_sml_iskra_mt175_one_way(f.read()))
+
 if __name__ == '__main__':
     try:
         unittest.main()

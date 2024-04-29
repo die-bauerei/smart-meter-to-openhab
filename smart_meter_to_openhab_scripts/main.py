@@ -49,7 +49,7 @@ def _exec_process(params : List[str]) -> None:
     if rc != 0:
         raise Exception("Failed to execute command "+ ' '.join(params)+". Return code was: "+str(result.returncode))
 
-def _run(logger : logging.Logger, read_count : int, raw_data_dump_dir : Union[Path, None] = None) -> None:
+def _run(logger : logging.Logger, read_count : int, uhubctl : bool, raw_data_dump_dir : Union[Path, None] = None) -> None:
     from smart_meter_to_openhab.openhab import OpenhabConnection
     from smart_meter_to_openhab.sml_iskra_mt175 import SmlIskraMt175OneWay
     from smart_meter_to_openhab.utils import manage_rolling_list
@@ -60,19 +60,30 @@ def _run(logger : logging.Logger, read_count : int, raw_data_dump_dir : Union[Pa
     sml_iskra = SmlIskraMt175OneWay('/dev/ttyUSB0', logger, raw_data_dump_dir)
     logger.info("Connections established. Starting to transfer smart meter values to openhab.")
     desired_number_of_persistence_values=6
+    invalid_reads_in_a_row=0
     datetimes_before_post_to_oh : List[datetime] =[]
     while True:
         logger.info("Reading SML data")
-        ref_smart_meter_value=oh_connection.get_median_from_items()
-        values=sml_iskra.read_avg(read_count, ref_values=ref_smart_meter_value)
+        values=sml_iskra.read_avg(read_count)
+        invalid_reads_in_a_row = invalid_reads_in_a_row+1 if values.is_invalid() else 0
         logger.info(f"current values: {values}")
         datetimes_before_post_to_oh=manage_rolling_list(datetimes_before_post_to_oh, desired_number_of_persistence_values, datetime.now())
         oh_connection.post_to_items(values)
         logger.info("Values posted to openHAB")
+        if invalid_reads_in_a_row == desired_number_of_persistence_values:
+            logger.error(f"Reading values from smart meter failed {invalid_reads_in_a_row} times in a row.")
+            if uhubctl:
+                logger.error("Power off and on usb ports and exiting process")
+                # TODO: sudo reboot seems to help a lot more. But lets try this first
+                _exec_process(["sudo", "uhubctl", "-a", "cycle", "-d", "10", "-p", "1-5"])
+            else:
+                logger.error("Exiting process")
+            break
         if len(datetimes_before_post_to_oh) == desired_number_of_persistence_values:
             # NOTE: exclude the latest values since oh sometimes has not handled the post requests from above yet.
             if not oh_connection.check_if_persistence_values_updated(start_time=datetimes_before_post_to_oh[0], 
                                                                      end_time=datetimes_before_post_to_oh[-1]):
+                logger.error("openHAB items ping NOT successful.")
                 break
             logger.info("openHAB items ping successful.")
 
@@ -87,14 +98,7 @@ def main() -> None:
     logger.setLevel(log_level_from_arg(args.verbose))
     try:
         raw_data_dump_dir=args.raw_data_dump_dir if args.raw_data_dump_dir else None
-        _run(logger, args.smart_meter_read_count, raw_data_dump_dir)
-
-        if args.uhubctl:
-            logger.error("openHAB items seem to have not been updated - Power off and on usb ports and exiting process")
-            # TODO: sudo reboot seems to help a lot more. But lets try this first
-            _exec_process(["sudo", "uhubctl", "-a", "cycle", "-d", "10", "-p", "1-5"])
-        else:
-            logger.error("openHAB items seem to have not been updated - exiting process")
+        _run(logger, args.smart_meter_read_count, args.uhubctl, raw_data_dump_dir)
     except Exception as e:
         logger.exception("Caught Exception: " + str(e))
     except:

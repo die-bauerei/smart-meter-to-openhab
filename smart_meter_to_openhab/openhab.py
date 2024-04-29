@@ -5,22 +5,11 @@ from logging import Logger
 from requests.auth import HTTPBasicAuth
 from requests.adapters import HTTPAdapter, Retry
 from typing import List, Tuple
-from statistics import median
 from .interfaces import *
 
 # disable warnings about insecure requests because ssl verification is disabled
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-def _get_median(list_values : List[List[float]]) -> SmartMeterValues:
-    smart_meter_values : List[OhItemAndValue] = []
-    value_index=0
-    for item in SmartMeterValues.oh_item_names():
-        if item:
-            avg_value = median(list_values[value_index]) if len(list_values[value_index]) > 1 else None
-            smart_meter_values.append(OhItemAndValue(item, avg_value))
-            value_index+=1
-    return SmartMeterValues.create(smart_meter_values)
 
 class OpenhabConnection():
     def __init__(self, oh_host : str, oh_user : str, oh_passwd : str, logger : Logger) -> None:
@@ -65,6 +54,8 @@ class OpenhabConnection():
     def get_values_from_items(self) -> SmartMeterValues:
         return SmartMeterValues.create(self.get_item_value_list_from_items(SmartMeterValues.oh_item_names()))
 
+    # NOTE: This can potentially return values, although no new values have been posted. Depending on the config: 
+    # https://www.openhab.org/docs/configuration/persistence.html
     def _get_persistence_values(self, oh_item_names : Tuple[str, ...], start_time : datetime.datetime, end_time : datetime.datetime) -> PersistenceValuesType:
         pers_values = []
         for item in oh_item_names:
@@ -92,9 +83,3 @@ class OpenhabConnection():
             for index, values in enumerate(pers_values):
                 self._logger.warning(f"Values for index {index}: {values}")
         return updated
-
-    def get_median_from_items(self, timedelta : datetime.timedelta = datetime.timedelta(minutes=30)) -> SmartMeterValues:
-        end_time=datetime.datetime.now()
-        start_time=end_time-timedelta
-        pers_values=self._get_persistence_values(SmartMeterValues.oh_item_names(), start_time, end_time)
-        return _get_median(pers_values)

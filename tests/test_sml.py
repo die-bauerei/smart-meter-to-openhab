@@ -46,17 +46,17 @@ class TestSml(unittest.TestCase):
         self.assertIsNone(read_values.phase_1_consumption.value)
         self.assertEqual(TestSml._test_values[0], read_values)
 
-    def test_read_with_ref_values(self) -> None:
+    def test_read_with_prev_values(self) -> None:
         TestSml._function_call_count=0
-        TestSml._test_values[0]=SmartMeterValues(100, 200, 300, 600, 2.5)
-        ref_values=SmartMeterValues(50, 50, 50, 50, 50)
-        read_values=self._test_reader.read_avg(read_count=1, ref_values=ref_values)
+        TestSml._test_values[0]=SmartMeterValues(100, 200, 300, 600, 60)
+        SmartMeterReader._prev_avg_values=SmartMeterValues(50, 50, 50, 50, 50)
+        read_values=self._test_reader.read_avg(read_count=1)
         self.assertEqual(TestSml._test_values[0], read_values)
 
         # If there is an outlier, all return values should be None
         TestSml._function_call_count=0
-        TestSml._test_values[0].phase_1_consumption.value=1000000
-        read_values=self._test_reader.read_avg(read_count=1, ref_values=ref_values)
+        TestSml._test_values[0].electricity_meter.value=1000000
+        read_values=self._test_reader.read_avg(read_count=1)
         self.assertTrue(all(value is None for value in read_values.value_list()))
 
     def test_read_avg(self) -> None:

@@ -3,41 +3,33 @@ import os
 import logging
 from datetime import timedelta, datetime
 from logging import Logger
-from typing import List, Any, Optional
+from typing import List, Optional
 from pathlib import Path
 from time import sleep
 from abc import ABC, abstractmethod
 from .interfaces import SmartMeterValues
 
-MIN_REF_VALUE_IN_WATT=50
-def _has_outlier(value_list : List[Any], ref_value_list : List[Any]) -> bool:
-    for i in range(len(value_list)):
-        if value_list[i] is not None and ref_value_list[i] is not None and value_list[i]*0.001 > max(ref_value_list[i], MIN_REF_VALUE_IN_WATT):
-            return True
-    return False
-
 class SmartMeterReader(ABC):
+    _prev_avg_values : SmartMeterValues = SmartMeterValues()
+
     def __init__(self, logger : Logger, raw_data_dump_dir : Optional[Path] = None) -> None:
         self._logger=logger
         self._latest_raw_data=''
         self._raw_data_dump_dir=raw_data_dump_dir
         self._raw_data_dump_invalid_counter=0
-        self._raw_data_dump_outlier_counter=0
+        self._raw_data_dump_inconsistent_counter=0
         self._raw_data_dump_valid_counter=0
         if self._raw_data_dump_dir:
             os.makedirs(self._raw_data_dump_dir, exist_ok=True)
             self._logger.info(f"Using directory {self._raw_data_dump_dir} for raw data dumps.")
 
-    def read_avg(self, read_count : int, ref_values : SmartMeterValues = SmartMeterValues()) -> SmartMeterValues:
+    def read_avg(self, read_count : int) -> SmartMeterValues:
         """Read average data from the smart meter
 
         Parameters
         ----------
         read_count : int
             specifies the number of performed reads that are averaged. Between each read is a sleep of 1 sec
-        ref_values : SmartMeterValues
-            Values that are used as baseline. If a new read value is 100 times higher as the given reference value, 
-            it is considered as outlier and will be ignored.
             
         Returns
         -------
@@ -46,53 +38,42 @@ class SmartMeterReader(ABC):
         """
         all_values : List[SmartMeterValues] = []
         for i in range(read_count):
-            values=self.read(ref_values)
-            if values.is_valid():
-                 all_values.append(values)
+            all_values.append(self._read_raw())
             sleep(1)
-        if len(all_values) < read_count:
-            self._logger.warning(f"Expected {read_count} valid values but only received {len(all_values)}. Returning average value anyway.")
-        return SmartMeterValues.create_avg(all_values)
 
-    def read(self, ref_values : SmartMeterValues) -> SmartMeterValues:
-        """Read data from the smart meter and try to validate them
+        good_values : List[SmartMeterValues] = []
+        for values in all_values:
+            if values.is_invalid():
+                self._logger.warning(f"Detected invalid values during read. Ignoring following values: {values}")
+                if self._raw_data_dump_dir:
+                    with open(self._raw_data_dump_dir / f"raw_data_dump_invalid_{self._raw_data_dump_invalid_counter}.sml", 'w') as f:
+                        f.write(self._latest_raw_data)
+                    self._raw_data_dump_invalid_counter+=1
+            elif values.is_inconsistent(SmartMeterReader._prev_avg_values):
+                self._logger.warning(f"Detected inconsistent values during read. Ignoring following values: {values}")
+                if self._raw_data_dump_dir:
+                    with open(self._raw_data_dump_dir / f"raw_data_dump_inconsistent_{self._raw_data_dump_inconsistent_counter}.sml", 'w') as f:
+                        f.write(self._latest_raw_data)
+                    self._raw_data_dump_inconsistent_counter+=1
+            else:
+                if self._raw_data_dump_dir and self._logger.level == logging.DEBUG:
+                    with open(self._raw_data_dump_dir / f"raw_data_dump_valid_{self._raw_data_dump_valid_counter}.sml", 'w') as f:
+                        f.write(self._latest_raw_data)
+                    self._raw_data_dump_valid_counter+=1
+                good_values.append(values)
 
-        Parameters
-        ----------
-        ref_values : SmartMeterValues
-            Values that are used as baseline to detect outliers
-        
-        Returns
-        -------
-        SmartMeterValues
-            Contains the data read from the smart meter
-        """
-        ref_value_list=ref_values.value_list()
-        values=self._read_raw()
-        if values.is_invalid():
-            self._logger.info(f"Detected invalid values during read. Trying again")
-            if self._raw_data_dump_dir:
-                with open(self._raw_data_dump_dir / f"raw_data_dump_invalid_{self._raw_data_dump_invalid_counter}.sml", 'w') as f:
-                    f.write(self._latest_raw_data)
-                self._raw_data_dump_invalid_counter+=1
-        value_list=values.value_list()
-        if _has_outlier(value_list, ref_value_list):
-            self._logger.info(f"Detected unrealistic values during read. Trying again")
-            if self._raw_data_dump_dir:
-                with open(self._raw_data_dump_dir / f"raw_data_dump_outlier_{self._raw_data_dump_outlier_counter}.sml", 'w') as f:
-                    f.write(self._latest_raw_data)
-                self._raw_data_dump_outlier_counter+=1
+        if len(good_values) < read_count:
+            self._logger.warning(f"Expected {read_count} valid values but only received {len(good_values)}. Returning average value anyway.")
 
-        if values.is_invalid() or _has_outlier(value_list, ref_value_list):
-            self._logger.warning(f"Unable to read and validate data. Ignoring following values: {values}")
-            values.reset()
-
-        if self._raw_data_dump_dir and self._logger.level == logging.DEBUG and values.is_valid():
-            with open(self._raw_data_dump_dir / f"raw_data_dump_valid_{self._raw_data_dump_valid_counter}.sml", 'w') as f:
-                f.write(self._latest_raw_data)
-            self._raw_data_dump_valid_counter+=1
-
-        return values
+        if SmartMeterReader._prev_avg_values.is_invalid():
+            # Creating initial previous values. Implication: Consistency check (above) always returns True. 
+            # In this case it is best to return the median. This should most likely ignore possible inconsistent outlier in the first run (call of this method).
+            avg_value=SmartMeterValues.create_median(good_values)
+        else:
+            # When having a valid previous value, it is better to return the mean value since the inconsistent outliers have been removed already.
+            avg_value=SmartMeterValues.create_mean(good_values)
+        SmartMeterReader._prev_avg_values=avg_value
+        return avg_value
 
     @abstractmethod
     def _read_raw(self) -> SmartMeterValues:

@@ -69,16 +69,28 @@ class TestInterfaces(unittest.TestCase):
     def test_creation_average(self) -> None:
         values_1=SmartMeterValues(100, 200, 300, 600, 2.5)
         values_2=SmartMeterValues(200, 300, 400, 700, 3.5)
-        new_values=SmartMeterValues.create_avg([values_1, values_2])
+        new_values=SmartMeterValues.create_mean([values_1, values_2])
         self.assertEqual(SmartMeterValues(150, 250, 350, 650, 3.0), new_values)
 
         values_incl_none_1=SmartMeterValues(200, 300, None, 300, None)
-        new_values=SmartMeterValues.create_avg([values_1, values_incl_none_1])
+        new_values=SmartMeterValues.create_mean([values_1, values_incl_none_1])
         self.assertEqual(SmartMeterValues(150, 250, 300, 450, 2.5), new_values)
         
         values_incl_none_2=SmartMeterValues(100, None, 100, 100, None)
-        new_values=SmartMeterValues.create_avg([values_incl_none_1, values_incl_none_2])
+        new_values=SmartMeterValues.create_mean([values_incl_none_1, values_incl_none_2])
         self.assertEqual(SmartMeterValues(150, 300, 100, 200, None), new_values)
+
+        new_values=SmartMeterValues.create_mean([SmartMeterValues(), SmartMeterValues()])
+        self.assertEqual(SmartMeterValues(), new_values)
+
+        new_values=SmartMeterValues.create_mean([])
+        self.assertEqual(SmartMeterValues(), new_values)
+
+        values_1=SmartMeterValues(100, 200, 300, 600, 2.5)
+        values_2=SmartMeterValues(200, 300, 400, 700, 3.5)
+        values_3=SmartMeterValues(2000, 3000, 4000, 7000, 30.5)
+        new_values=SmartMeterValues.create_median([values_1, values_2, values_3])
+        self.assertEqual(values_2, new_values)
 
     def test_is_invalid(self) -> None:
         values=SmartMeterValues(100, 200, 300, 600, 2.5)
@@ -184,10 +196,12 @@ class TestInterfaces(unittest.TestCase):
         self.assertTrue(zeros.is_valid())
         self.assertTrue(valid_no_electricity_meter.is_valid())
 
+        self.assertFalse(SmartMeterValues.check_if_updated([]))
+        self.assertFalse(SmartMeterValues.check_if_updated([[]]))
+        self.assertFalse(SmartMeterValues.check_if_updated([[],[]]))
         self.assertFalse(SmartMeterValues.check_if_updated(convert_to_persistence_values(
             [valid_no_electricity_meter, valid_no_electricity_meter])))
         self.assertFalse(SmartMeterValues.check_if_updated(convert_to_persistence_values([valid_no_electricity_meter])))
-        self.assertFalse(SmartMeterValues.check_if_updated([]))
         self.assertFalse(SmartMeterValues.check_if_updated(convert_to_persistence_values([valid_all_1])))
         self.assertFalse(SmartMeterValues.check_if_updated(convert_to_persistence_values([zeros])))
         self.assertFalse(SmartMeterValues.check_if_updated(convert_to_persistence_values([valid_all_1, invalid])))
@@ -197,6 +211,17 @@ class TestInterfaces(unittest.TestCase):
         self.assertTrue(SmartMeterValues.check_if_updated(convert_to_persistence_values([valid_all_1, valid_all_2])))
         self.assertTrue(SmartMeterValues.check_if_updated(convert_to_persistence_values([valid_all_1, zeros])))
         self.assertTrue(SmartMeterValues.check_if_updated(convert_to_persistence_values([valid_all_1, valid_partial])))
+
+    def test_is_consistent(self) -> None:
+        values=SmartMeterValues(100, 200, 300, 400, 500)
+        self.assertTrue(values.is_consistent(SmartMeterValues()))
+        self.assertTrue(values.is_consistent(SmartMeterValues(0, 0, 0, 0, 400)))
+        self.assertFalse(values.is_consistent(SmartMeterValues(0, 0, 0, 0, 600)))
+        self.assertFalse(values.is_consistent(SmartMeterValues(0, 0, 0, 0, 100)))
+        self.assertFalse(values.is_inconsistent(SmartMeterValues()))
+        self.assertFalse(values.is_inconsistent(SmartMeterValues(0, 0, 0, 0, 400)))
+        self.assertTrue(values.is_inconsistent(SmartMeterValues(0, 0, 0, 0, 600)))
+        self.assertTrue(values.is_inconsistent(SmartMeterValues(0, 0, 0, 0, 100)))
         
 if __name__ == '__main__':
     try:

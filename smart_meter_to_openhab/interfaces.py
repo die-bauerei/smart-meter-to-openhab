@@ -1,8 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Any, Union, Tuple, ClassVar, Iterator
-from statistics import mean
-from abc import ABC
+from typing import List, Any, Union, Tuple, ClassVar, Iterator, Callable
+from statistics import mean, median
+from abc import ABC, abstractmethod
 from functools import cache
 import os
 from .utils import PersistenceValuesType
@@ -65,12 +65,13 @@ class OhItemAndValueContainer(ABC):
     def __iter__(self) -> Iterator[OhItemAndValue]:
         return iter(self._oh_items_and_values)
     
+    @abstractmethod
     def is_invalid(self) -> bool:
-        number_values=[value for value in self.value_list() if value is not None]
-        return (not number_values) or any(value < 0 for value in number_values)
+        pass
     
+    @abstractmethod
     def is_valid(self) -> bool:
-        return not self.is_invalid()
+        pass
     
     def value_list(self) -> List[Any]:
         # consider only the values that really will be used (oh_item name not empty)
@@ -116,6 +117,22 @@ class SmartMeterValues(OhItemAndValueContainer):
     def electricity_meter(self) -> OhItemAndValue:
         return self._oh_items_and_values[4]
     
+    def is_invalid(self) -> bool:
+        number_values=[value for value in self.value_list() if value is not None]
+        return (not number_values) or any(value < 0 for value in number_values)
+    
+    def is_valid(self) -> bool:
+        return not self.is_invalid()
+    
+    def is_inconsistent(self, prev_values : SmartMeterValues) -> bool:
+        return not self.is_consistent(prev_values)
+
+    def is_consistent(self, prev_values : SmartMeterValues) -> bool:
+        if self.electricity_meter.value is None or prev_values.electricity_meter.value is None:
+            return True
+        e_meter_unexpected_high = prev_values.electricity_meter.value > 1 and self.electricity_meter.value > prev_values.electricity_meter.value*2
+        return self.electricity_meter.value >= prev_values.electricity_meter.value and not e_meter_unexpected_high
+
     def __repr__(self) -> str:
         return f"L1={self.phase_1_consumption.value} L2={self.phase_2_consumption.value} "\
             f"L3={self.phase_3_consumption.value} Overall={self.overall_consumption.value} E={self.electricity_meter.value}"
@@ -130,27 +147,36 @@ class SmartMeterValues(OhItemAndValueContainer):
         value=SmartMeterValues(user_specified_oh_item_names=user_specified_oh_item_names)
         value.assign_values(values)
         return value
+
+    @staticmethod
+    def create_mean(values : List[SmartMeterValues], user_specified_oh_item_names : Union[SmartMeterOhItemNames, None] = None) -> SmartMeterValues:
+        return SmartMeterValues.create_avg(values, mean, user_specified_oh_item_names)
     
     @staticmethod
-    def create_avg(values : List[SmartMeterValues], user_specified_oh_item_names : Union[SmartMeterOhItemNames, None] = None) -> SmartMeterValues:
+    def create_median(values : List[SmartMeterValues], user_specified_oh_item_names : Union[SmartMeterOhItemNames, None] = None) -> SmartMeterValues:
+        return SmartMeterValues.create_avg(values, median, user_specified_oh_item_names)
+    
+    @staticmethod
+    def create_avg(values : List[SmartMeterValues], operator : Callable[[List[float]], float], 
+                   user_specified_oh_item_names : Union[SmartMeterOhItemNames, None] = None ) -> SmartMeterValues:
         smart_meter_values=SmartMeterValues(None, None, None, None, None, user_specified_oh_item_names)
         phase_1_value_list = [value.phase_1_consumption.value for value in values if value.phase_1_consumption.value is not None]
         if phase_1_value_list: 
-            smart_meter_values.phase_1_consumption.value = mean(phase_1_value_list)
+            smart_meter_values.phase_1_consumption.value = operator(phase_1_value_list)
         phase_2_value_list = [value.phase_2_consumption.value for value in values if value.phase_2_consumption.value is not None]
         if phase_2_value_list: 
-            smart_meter_values.phase_2_consumption.value = mean(phase_2_value_list)
+            smart_meter_values.phase_2_consumption.value = operator(phase_2_value_list)
         phase_3_value_list = [value.phase_3_consumption.value for value in values if value.phase_3_consumption.value is not None]
         if phase_3_value_list: 
-            smart_meter_values.phase_3_consumption.value = mean(phase_3_value_list)
+            smart_meter_values.phase_3_consumption.value = operator(phase_3_value_list)
         overall_consumption_value_list = [value.overall_consumption.value for value in values if value.overall_consumption.value is not None]
         if overall_consumption_value_list: 
-            smart_meter_values.overall_consumption.value = mean(overall_consumption_value_list)
+            smart_meter_values.overall_consumption.value = operator(overall_consumption_value_list)
         electricity_meter_value_list = [value.electricity_meter.value for value in values if value.electricity_meter.value is not None]
         if electricity_meter_value_list: 
-            smart_meter_values.electricity_meter.value = mean(electricity_meter_value_list)
+            smart_meter_values.electricity_meter.value = operator(electricity_meter_value_list)
         return smart_meter_values
-    
+
     # NOTE: Use PersistenceValuesType as input to consider that the count of values can potentially be different per item.
     # This could be some data optimization in openhab or similar. Whatever the reason is, we have to support it.
     @staticmethod
