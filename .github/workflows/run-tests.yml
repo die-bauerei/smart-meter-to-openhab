@@ -9,8 +9,10 @@ env:
   ELECTRICITY_METER_KWH_OH_ITEM: 'unit_tests_smart_meter_electricity_meter'
 
 on:
-  push:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build-n-run-tests:
