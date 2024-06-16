@@ -50,7 +50,7 @@ NOTE: certificate verification is turned off, in case *OH_HOST* refers to an htt
 nohup smart_meter_to_openhab --logfile ~/smart_meter.log --verbose &
 ```
 
-## Autostart after reboot and on failure##
+## Autostart after reboot and on failure ##
 Create a systemd service by opening the file */etc/systemd/system/smart_meter_to_openhab.service* and copy paste the following contents. Replace User/Group/ExecStart accordingly. 
 ```bash
 [Unit]
