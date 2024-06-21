@@ -63,7 +63,7 @@ Type=simple
 User=openhab
 Group=openhab
 UMask=002
-Restart=on-failure
+Restart=always
 RestartSec=5s
 ExecStart=/usr/bin/bash -lc "/home/openhab/smart_meter_py_env/bin/smart_meter_to_openhab --logfile /home/openhab/smart_meter.log --verbose"
 
@@ -84,9 +84,6 @@ sudo systemctl stop smart_meter_to_openhab.service
 sudo systemctl restart smart_meter_to_openhab.service
 sudo systemctl status smart_meter_to_openhab.service
 ```
-
-## uhubctl ##
-The USB infrared adapter sometimes seems to lose its connection. It helps to just unplug and again plug the adapter. The same can be achieved if you Power off and on usb ports. This can be configured by the argument *uhubctl*. The current implementation powers off and on all usb ports on a raspberry pi (change it to your needs). The package uhubctl (https://github.com/mvp/uhubctl) can be installed via *sudo apt install uhubctl* on a debian based system.
 
 ## Development ##
 Development is done in wsl2 on ubuntu 22.04.
